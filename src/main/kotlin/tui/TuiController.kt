@@ -148,13 +148,7 @@ class TuiController(val outputRoot: Path) {
             menuOpen = !menuOpen; helpOpen = false; menuSelection = section.ordinal; return
         }
         if (menuOpen) {
-            when (event.key) {
-                "ArrowUp" -> menuSelection = (menuSelection + Section.entries.size - 1) % Section.entries.size
-                "ArrowDown" -> menuSelection = (menuSelection + 1) % Section.entries.size
-                "Enter" -> {
-                    section = Section.entries[menuSelection]; menuOpen = false; detailsOpen = false
-                }
-            }
+            handleMenu(event)
             return
         }
         if (event.key in listOf("PageUp", "PageDown")) {
@@ -168,13 +162,7 @@ class TuiController(val outputRoot: Path) {
         if (event.key == "Tab") {
             focus = (focus + if (event.shift) focusCount - 1 else 1) % focusCount; return
         }
-        val input = when {
-            section == Section.SIGNATURES && focus == 0 -> originalMessage
-            section == Section.SIGNATURES && focus == 1 -> changedMessage
-            section == Section.TRANSFERS && focus == 2 -> amount
-            section == Section.JOURNAL && focus == 1 -> exportRoot
-            else -> null
-        }
+        val input = focusedInput()
         if (input != null && input.key(event)) return
         if (event.key in listOf("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown")) {
             val delta = if (event.key in listOf("ArrowLeft", "ArrowUp")) -1 else 1
@@ -187,6 +175,24 @@ class TuiController(val outputRoot: Path) {
             return
         }
         if (event.key == "Enter") activate()
+    }
+
+    private fun focusedInput(): TextInput? = when {
+        section == Section.SIGNATURES && focus == 0 -> originalMessage
+        section == Section.SIGNATURES && focus == 1 -> changedMessage
+        section == Section.TRANSFERS && focus == 2 -> amount
+        section == Section.JOURNAL && focus == 1 -> exportRoot
+        else -> null
+    }
+
+    private fun handleMenu(event: KeyEvent) {
+        when (event.key) {
+            "ArrowUp" -> menuSelection = (menuSelection + Section.entries.size - 1) % Section.entries.size
+            "ArrowDown" -> menuSelection = (menuSelection + 1) % Section.entries.size
+            "Enter" -> {
+                section = Section.entries[menuSelection]; menuOpen = false; detailsOpen = false
+            }
+        }
     }
 
     fun itemCount(): Int = when (section) {
@@ -233,89 +239,111 @@ class TuiController(val outputRoot: Path) {
     }
 
     private fun activate() {
-        val blockchain = session.blockchain
-        val pending = blockchain.snapshot().pending
-        fun unavailable(reason: String) {
-            status = "НЕДОСТУПНО: $reason"
-        }
-
-        fun rememberLast() {
-            details[section] = session.reports.snapshot().events.last().result
-        }
-
-        fun validation(result: ValidationResult) {
-            status = when (result) {
-                ValidationResult.Valid -> "УСПЕХ: VALID"
-                is ValidationResult.Invalid -> "ОТКАЗ ${result.error.code}: ${result.error.message}"
-            }
-            rememberLast()
-        }
         when (section) {
             Section.WALLETS -> openDetails()
-
-            Section.SIGNATURES -> if (focus < 2) focus++ else if (focus == 3) openDetails() else {
-                details[section] = session.signMessage(originalMessage.value, changedMessage.value)
-                status = "УСПЕХ: подпись создана; результаты трёх проверок в подробностях"
-            }
-
-            Section.TRANSFERS -> when (focus) {
-                in 0..2 -> focus++
-                3 -> validation(
-                    session.transfer(
-                        blockchain.wallets[sender].address,
-                        blockchain.wallets[recipient].address,
-                        amount.value
-                    ).result
-                )
-
-                else -> if (pending.isEmpty()) unavailable("очередь пуста") else openDetails()
-            }
-
-            Section.MERKLE -> if (focus == 0) focus++ else if (focus == 2) openDetails()
-            else if (leafCount > pending.size) unavailable("нужно $leafCount pending-записей") else {
-                session.merkle(leafCount)
-                rememberLast(); status = "УСПЕХ: дерево для $leafCount записей; полные уровни в подробностях"
-            }
-
-            Section.BLOCKS -> when (focus) {
-                0 -> if (pending.isEmpty()) unavailable("сначала создайте переводы") else {
-                    session.prepareCandidates(); rememberLast(); status = "УСПЕХ: кандидаты сформированы и проверены"
-                }
-
-                1, 2 -> if (session.candidates.isEmpty()) unavailable("сначала сформируйте кандидатов") else {
-                    val result = session.resolve(if (focus == 2) setOf(NodeId.N1, NodeId.N2) else emptySet())
-                    rememberLast(); status =
-                        if (result.winner == null) "ОЖИДАНИЕ: NO_QUORUM; состояние не изменено" else "УСПЕХ: ACCEPTED ${result.winner.blockHash.hex}"
-                }
-
-                3 -> validation(session.verifyChain())
-                else -> if (session.candidates.isEmpty()) unavailable("нет кандидатов") else openDetails()
-            }
-
+            Section.SIGNATURES -> activateSignatures()
+            Section.TRANSFERS -> activateTransfer()
+            Section.MERKLE -> activateMerkle()
+            Section.BLOCKS -> activateBlocks()
             Section.EXPERIMENTS -> if (focus == 0) runExperiments() else if (experiments.isNotEmpty()) openDetails()
+            Section.JOURNAL -> activateJournal()
+        }
+    }
 
-            Section.JOURNAL -> when (focus) {
-                0 -> openDetails()
+    private fun activateSignatures() {
+        if (focus < 2) focus++ else if (focus == 3) openDetails() else {
+            details[section] = session.signMessage(originalMessage.value, changedMessage.value)
+            status = "УСПЕХ: подпись создана; результаты трёх проверок в подробностях"
+        }
+    }
 
-                1 -> focus++
-                else -> {
-                    val result = try {
-                        export(Path.of(exportRoot.value))
-                    } catch (error: InvalidPathException) {
-                        WriteResult.Failed(error.message ?: "Invalid directory")
-                    }
-                    session.record("export", buildJsonObject {
-                        put("directory", exportRoot.value); put(
-                            "status",
-                            if (result == WriteResult.Saved) "SAVED" else "FAILED"
-                        )
-                        if (result is WriteResult.Failed) put("reason", result.reason)
-                    })
-                    status =
-                        if (result == WriteResult.Saved) "УСПЕХ: материалы сохранены" else "ОШИБКА ЭКСПОРТА: ${(result as WriteResult.Failed).reason}"
+    private fun activateTransfer() {
+        val blockchain = session.blockchain
+        val pending = blockchain.snapshot().pending
+
+        when (focus) {
+            in 0..2 -> focus++
+            3 -> validation(
+                session.transfer(
+                    blockchain.wallets[sender].address,
+                    blockchain.wallets[recipient].address,
+                    amount.value
+                ).result
+            )
+
+            else -> if (pending.isEmpty()) unavailable("очередь пуста") else openDetails()
+        }
+    }
+
+    private fun activateMerkle() {
+        val blockchain = session.blockchain
+        val pending = blockchain.snapshot().pending
+
+        if (focus == 0) focus++ else if (focus == 2) openDetails()
+        else if (leafCount > pending.size) unavailable("нужно $leafCount pending-записей") else {
+            session.merkle(leafCount)
+            rememberLast(); status = "УСПЕХ: дерево для $leafCount записей; полные уровни в подробностях"
+        }
+    }
+
+    private fun activateBlocks() {
+        val pending = session.blockchain.snapshot().pending
+
+        when (focus) {
+            0 -> if (pending.isEmpty()) unavailable("сначала создайте переводы") else {
+                session.prepareCandidates(); rememberLast(); status = "УСПЕХ: кандидаты сформированы и проверены"
+            }
+
+            1, 2 -> if (session.candidates.isEmpty()) unavailable("сначала сформируйте кандидатов") else {
+                val result = session.resolve(if (focus == 2) setOf(NodeId.N1, NodeId.N2) else emptySet())
+                rememberLast(); status =
+                    if (result.winner == null) "ОЖИДАНИЕ: NO_QUORUM; состояние не изменено" else "УСПЕХ: ACCEPTED ${result.winner.blockHash.hex}"
+            }
+
+            3 -> validation(session.verifyChain())
+            else -> if (session.candidates.isEmpty()) unavailable("нет кандидатов") else openDetails()
+        }
+    }
+
+    private fun activateJournal() {
+        when (focus) {
+            0 -> openDetails()
+
+            1 -> focus++
+            else -> {
+                val result = try {
+                    export(Path.of(exportRoot.value))
+                } catch (error: InvalidPathException) {
+                    WriteResult.Failed(error.message ?: "Invalid directory")
                 }
+                session.record("export", buildJsonObject {
+                    put("directory", exportRoot.value); put(
+                        "status",
+                        if (result == WriteResult.Saved) "SAVED" else "FAILED"
+                    )
+                    if (result is WriteResult.Failed) put("reason", result.reason)
+                })
+                status =
+                    if (result == WriteResult.Saved) "УСПЕХ: материалы сохранены" else "ОШИБКА ЭКСПОРТА: ${(result as WriteResult.Failed).reason}"
             }
         }
+    }
+
+    private fun unavailable(reason: String) {
+        status = "НЕДОСТУПНО: $reason"
+    }
+
+    private fun rememberLast() {
+        details[section] = session.reports.snapshot().events.last().result
+    }
+
+    private fun validation(result: ValidationResult) {
+        status = when (result) {
+            ValidationResult.Valid -> "УСПЕХ: VALID"
+            is ValidationResult.Invalid -> "ОТКАЗ ${result.error.code}: ${result.error.message}"
+        }
+
+        rememberLast()
     }
 
     private fun openDetails() {
