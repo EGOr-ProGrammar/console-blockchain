@@ -3,11 +3,12 @@ package crypto
 import model.*
 import java.security.*
 import java.security.spec.X509EncodedKeySpec
+import java.util.HexFormat
 
-fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 255) }
+fun ByteArray.toHex(): String = HexFormat.of().formatHex(this)
 fun String.hexBytes(): ByteArray {
     require(length % 2 == 0 && all { it in '0'..'9' || it in 'a'..'f' }) { "Invalid lowercase HEX" }
-    return ByteArray(length / 2) { substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+    return HexFormat.of().parseHex(this)
 }
 
 private val ed25519PublicPrefix = "302a300506032b6570032100".hexBytes()
