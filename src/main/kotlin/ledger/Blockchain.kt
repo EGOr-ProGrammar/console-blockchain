@@ -2,6 +2,7 @@ package ledger
 
 import crypto.*
 import model.*
+import consensus.DefaultConsensusEngine
 
 data class SubmissionResult(val transaction: SignedTransaction?, val checks: Map<NodeId, ValidationResult>, val result: ValidationResult)
 
@@ -54,5 +55,24 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
             pending.removeAll { it.txId in included }
         }
         return result
+    }
+
+    fun resolve(candidates: List<Block>, abstainingNodes: Set<NodeId> = emptySet()): ConsensusResult {
+        val result = DefaultConsensusEngine().run(candidates, snapshot(), abstainingNodes)
+        result.winner?.let { check(commit(it) is BlockValidation.Valid) { "Winner must still extend current state" } }
+        return result
+    }
+
+    fun conflictCandidates(): List<Block> {
+        require(pending.size == 3)
+        val first = buildCandidate("P1")
+        val second = buildCandidate("P2", pending.reversed())
+        val original = pending.first()
+        val body = original.body.copy(amount = original.body.amount + 1)
+        val changed = original.copy(body = body, txId = JdkCryptography.sha256(CanonicalJson.encode(body.canonicalObject())))
+        val transactions = listOf(changed) + pending.drop(1)
+        val header = first.header.copy(merkleRoot = Merkle.build(transactions).root)
+        val third = Block(header, transactions, JdkCryptography.sha256(CanonicalJson.encode(header.canonicalObject())))
+        return listOf(first, second, third)
     }
 }
