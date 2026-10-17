@@ -63,4 +63,19 @@ class FileReportStoreTest {
         assertTrue(csv.contains("отказ"))
         assertTrue(csv.contains("SIGNATURE"))
     }
+
+    @Test
+    fun `CSV neutralizes spreadsheet formulas while JSON keeps original public data`() {
+        val store = FileReportStore(root, "experiments")
+        val inputs = listOf("=1+1", "+1+1", "-1+1", "@SUM(1)", "\t=1+1", "\r=1+1", "\n=1+1", "  =1+1", "＝1+1", "＋1+1", "－1+1", "＠SUM(1)")
+        for (input in inputs) {
+            assertEquals(WriteResult.Saved, store.record("experiment", buildJsonObject {
+                put("name", input); put("expected", "text"); put("actual", input); put("passed", true)
+            }))
+        }
+        val csv = Files.readString(store.directory.resolve("experiments.csv"))
+        for (input in inputs) assertTrue(csv.contains("\"\t$input\""), input)
+        val events = Files.readAllLines(store.directory.resolve("events.jsonl"))
+        assertEquals(inputs, events.map { Json.parseToJsonElement(it).jsonObject.getValue("result").jsonObject.getValue("name").jsonPrimitive.content })
+    }
 }

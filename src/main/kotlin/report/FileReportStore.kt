@@ -60,8 +60,7 @@ class FileReportStore(private var root: Path, private val type: String) : Report
         val temporary = Files.createTempFile(directory, ".$name-", ".tmp")
         try {
             Files.writeString(temporary, content, UTF_8)
-            try { Files.move(temporary, directory.resolve(name), REPLACE_EXISTING, ATOMIC_MOVE) }
-            catch (_: AtomicMoveNotSupportedException) { Files.move(temporary, directory.resolve(name), REPLACE_EXISTING) }
+            try { Files.move(temporary, directory.resolve(name), REPLACE_EXISTING, ATOMIC_MOVE) } catch (_: AtomicMoveNotSupportedException) { Files.move(temporary, directory.resolve(name), REPLACE_EXISTING) }
         } finally { Files.deleteIfExists(temporary) }
     }
 
@@ -122,7 +121,14 @@ class FileReportStore(private var root: Path, private val type: String) : Report
         appendLine("Подписи обнаруживают подмену авторства и данных; дерево связывает порядок записей с заголовком; фиксация состояния выполняется после кворума. Выбор минимального хэша — учебное правило, не защищённый промышленный консенсус.")
     }
 
-    private fun csv(rows: List<List<String>>): String = "\uFEFF" + rows.joinToString("\r\n", postfix = "\r\n") { row -> row.joinToString(",") { "\"${it.replace("\"", "\"\"")}\"" } }
+    private fun csv(rows: List<List<String>>): String = "\uFEFF" + rows.joinToString("\r\n", postfix = "\r\n") { row -> row.joinToString(",", transform = ::csvCell) }
+
+    private fun csvCell(value: String): String {
+        val first = value.trimStart().firstOrNull()
+        val unsafe = value.firstOrNull()?.isISOControl() == true || first != null && first in "=+-@＝＋－＠"
+        // CSV is for Excel viewing; JSON retains the exact value for programmatic use.
+        return "\"${if (unsafe) "\t" else ""}${value.replace("\"", "\"\"")}\""
+    }
     private fun markdown(rows: List<List<String>>): String = if (rows.isEmpty()) "" else
         (listOf(rows.first(), List(rows.first().size) { "---" }) + rows.drop(1)).joinToString("\n") { row -> "| " + row.joinToString(" | ") { it.replace("|", "\\|").replace("\n", "<br>") } + " |" }
 }
