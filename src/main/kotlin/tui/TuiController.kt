@@ -84,7 +84,7 @@ class TextInput(var value: String) {
     }
 }
 
-class TuiController(val outputRoot: Path) {
+class TuiController(outputRoot: Path) {
     val session = LabSession(outputRoot, "manual")
     var section = Section.WALLETS
     var menuOpen = false
