@@ -1,6 +1,6 @@
-package com.egorroman.blockchain.ledger
+package ledger
 
-import com.egorroman.blockchain.model.*
+import model.*
 
 /** Checks public fields, signature, nonce and confirmed balance without changing the snapshot. */
 interface TransactionValidator {

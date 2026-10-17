@@ -1,4 +1,4 @@
-package com.egorroman.blockchain.model
+package model
 
 import kotlinx.serialization.Serializable
 import java.util.Collections

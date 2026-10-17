@@ -1,4 +1,4 @@
-package com.egorroman.blockchain.model
+package model
 
 import org.junit.jupiter.api.Test
 import kotlin.test.*

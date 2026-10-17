@@ -1,6 +1,6 @@
-package com.egorroman.blockchain.report
+package report
 
-import com.egorroman.blockchain.model.frozenList
+import model.frozenList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 

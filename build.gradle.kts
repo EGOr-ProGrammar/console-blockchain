@@ -8,7 +8,7 @@ plugins {
     application
 }
 
-group = "com.egorroman"
+group = "blockchain"
 version = "1.0.0"
 
 repositories {
@@ -30,7 +30,7 @@ dependencies {
 }
 
 application {
-    mainClass = "com.egorroman.blockchain.app.MainKt"
+    mainClass = "app.MainKt"
 }
 
 graalvmNative {

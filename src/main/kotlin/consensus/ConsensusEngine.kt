@@ -1,6 +1,6 @@
-package com.egorroman.blockchain.consensus
+package consensus
 
-import com.egorroman.blockchain.model.*
+import model.*
 
 /** Three distinct voters independently prefer the least valid hash; two matching votes form quorum. */
 interface ConsensusEngine {

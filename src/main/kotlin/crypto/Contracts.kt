@@ -1,6 +1,6 @@
-package com.egorroman.blockchain.crypto
+package crypto
 
-import com.egorroman.blockchain.model.*
+import model.*
 import kotlinx.serialization.json.JsonElement
 
 /** Owns private keys; only public identity and signatures may leave this boundary. */
