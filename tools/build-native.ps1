@@ -18,6 +18,7 @@ try {
     if (Test-Path -LiteralPath (Join-Path $repository '.gradle\native-tools\portable-msvc')) {
         . (Join-Path $PSScriptRoot 'use-local-toolchain.ps1')
     }
+    & (Join-Path $PSScriptRoot 'build-mosaic-jni.ps1') -JdkHome $env:GRAALVM_HOME
     & .\gradlew.bat test verifyComposeClasspath nativeProbeCompile nativeCompile
     if ($LASTEXITCODE -ne 0) { throw "Native build failed: $LASTEXITCODE" }
 } finally {
