@@ -3,9 +3,9 @@ package tui
 import app.*
 import com.jakewharton.mosaic.layout.KeyEvent
 import crypto.canonicalObject
+import kotlinx.serialization.json.*
 import model.*
 import report.*
-import kotlinx.serialization.json.*
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 
@@ -108,7 +108,7 @@ class TuiController(val outputRoot: Path) {
         set(value) {
             when {
                 helpOpen -> helpScroll = value; detailsOpen -> detailScrolls[section.ordinal] =
-                value; else -> bodyScrolls[section.ordinal] = value
+                    value; else -> bodyScrolls[section.ordinal] = value
             }
         }
     var sender = 0
@@ -127,7 +127,7 @@ class TuiController(val outputRoot: Path) {
         private set
     val focusCount: Int
         get() = when (section) {
-        Section.WALLETS -> 1; Section.SIGNATURES -> 4; Section.TRANSFERS -> 5; Section.MERKLE -> 3
+            Section.WALLETS -> 1; Section.SIGNATURES -> 4; Section.TRANSFERS -> 5; Section.MERKLE -> 3
             Section.BLOCKS -> 5; Section.EXPERIMENTS -> 2; Section.JOURNAL -> 3
         }
 
@@ -136,7 +136,7 @@ class TuiController(val outputRoot: Path) {
         if (event.key == "Escape") {
             when {
                 helpOpen -> helpOpen = false; menuOpen -> menuOpen = false; detailsOpen -> detailsOpen =
-                false; else -> quit = true
+                    false; else -> quit = true
             }
             return
         }
@@ -223,14 +223,7 @@ class TuiController(val outputRoot: Path) {
             ?.result?.get("candidates")?.jsonArray?.getOrNull(selected) ?: JsonObject(emptyMap()) else details[section]
             ?: JsonObject(emptyMap())
 
-        Section.EXPERIMENTS -> experiments.getOrNull(selected)?.let {
-            buildJsonObject {
-                put("name", it.name); put("expected", it.expected); put("actual", it.actual); put(
-                "passed",
-                it.passed
-            )
-            }
-        } ?: JsonObject(emptyMap())
+        Section.EXPERIMENTS -> experiments.getOrNull(selected)?.publicJson() ?: JsonObject(emptyMap())
 
         Section.JOURNAL -> session.reports.snapshot().events.getOrNull(selected)
             ?.let { buildJsonObject { put("step", it.step); put("operation", it.operation); put("result", it.result) } }
@@ -258,13 +251,9 @@ class TuiController(val outputRoot: Path) {
             rememberLast()
         }
         when (section) {
-            Section.WALLETS -> {
-                detailsOpen = true; scroll = 0
-            }
+            Section.WALLETS -> openDetails()
 
-            Section.SIGNATURES -> if (focus < 2) focus++ else if (focus == 3) {
-                detailsOpen = true; scroll = 0
-            } else {
+            Section.SIGNATURES -> if (focus < 2) focus++ else if (focus == 3) openDetails() else {
                 details[section] = session.signMessage(originalMessage.value, changedMessage.value)
                 status = "УСПЕХ: подпись создана; результаты трёх проверок в подробностях"
             }
@@ -279,14 +268,11 @@ class TuiController(val outputRoot: Path) {
                     ).result
                 )
 
-                else -> if (pending.isEmpty()) unavailable("очередь пуста") else {
-                    detailsOpen = true; scroll = 0
-                }
+                else -> if (pending.isEmpty()) unavailable("очередь пуста") else openDetails()
             }
 
-            Section.MERKLE -> if (focus == 0) focus++ else if (focus == 2) {
-                detailsOpen = true; scroll = 0
-            } else if (leafCount > pending.size) unavailable("нужно $leafCount pending-записей") else {
+            Section.MERKLE -> if (focus == 0) focus++ else if (focus == 2) openDetails()
+            else if (leafCount > pending.size) unavailable("нужно $leafCount pending-записей") else {
                 session.merkle(leafCount)
                 rememberLast(); status = "УСПЕХ: дерево для $leafCount записей; полные уровни в подробностях"
             }
@@ -303,43 +289,13 @@ class TuiController(val outputRoot: Path) {
                 }
 
                 3 -> validation(session.verifyChain())
-                else -> if (session.candidates.isEmpty()) unavailable("нет кандидатов") else {
-                    detailsOpen = true; scroll = 0
-                }
+                else -> if (session.candidates.isEmpty()) unavailable("нет кандидатов") else openDetails()
             }
 
-            Section.EXPERIMENTS -> if (focus == 0) {
-                val experimentSession = LabSession(session.reports.directory.toAbsolutePath().parent, "experiments")
-                experimentSessions += experimentSession
-                experiments = ControlScenario.run(experimentSession)
-                experimentDirectory = experimentSession.reports.directory
-                session.record("experiments_launched", buildJsonObject {
-                    put("session_id", experimentSession.reports.snapshot().id); put(
-                    "directory",
-                    experimentDirectory.toString()
-                )
-                    put(
-                        "results",
-                        JsonArray(experiments.map {
-                            buildJsonObject {
-                                put("name", it.name); put(
-                                "expected",
-                                it.expected
-                            ); put("actual", it.actual); put("passed", it.passed)
-                            }
-                        })
-                    )
-                })
-                status = "ПРОВЕРКИ: ${experiments.count { it.passed }}/${experiments.size} в отдельной сессии"
-                (experimentSession.lastWrite as? WriteResult.Failed)?.let { status = "ОШИБКА ЭКСПОРТА: ${it.reason}" }
-            } else if (experiments.isNotEmpty()) {
-                detailsOpen = true; scroll = 0
-            }
+            Section.EXPERIMENTS -> if (focus == 0) runExperiments() else if (experiments.isNotEmpty()) openDetails()
 
             Section.JOURNAL -> when (focus) {
-                0 -> {
-                    detailsOpen = true; scroll = 0
-                }
+                0 -> openDetails()
 
                 1 -> focus++
                 else -> {
@@ -350,9 +306,9 @@ class TuiController(val outputRoot: Path) {
                     }
                     session.record("export", buildJsonObject {
                         put("directory", exportRoot.value); put(
-                        "status",
-                        if (result == WriteResult.Saved) "SAVED" else "FAILED"
-                    )
+                            "status",
+                            if (result == WriteResult.Saved) "SAVED" else "FAILED"
+                        )
                         if (result is WriteResult.Failed) put("reason", result.reason)
                     })
                     status =
@@ -360,5 +316,23 @@ class TuiController(val outputRoot: Path) {
                 }
             }
         }
+    }
+
+    private fun openDetails() {
+        detailsOpen = true; scroll = 0
+    }
+
+    private fun runExperiments() {
+        val experimentSession = LabSession(session.reports.directory.toAbsolutePath().parent, "experiments")
+        experimentSessions += experimentSession
+        experiments = ControlScenario.run(experimentSession)
+        experimentDirectory = experimentSession.reports.directory
+        session.record("experiments_launched", buildJsonObject {
+            put("session_id", experimentSession.reports.snapshot().id)
+            put("directory", experimentDirectory.toString())
+            put("results", JsonArray(experiments.map { it.publicJson() }))
+        })
+        status = "ПРОВЕРКИ: ${experiments.count { it.passed }}/${experiments.size} в отдельной сессии"
+        (experimentSession.lastWrite as? WriteResult.Failed)?.let { status = "ОШИБКА ЭКСПОРТА: ${it.reason}" }
     }
 }

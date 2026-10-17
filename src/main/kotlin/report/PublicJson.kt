@@ -1,8 +1,12 @@
 package report
 
 import crypto.*
-import model.*
 import kotlinx.serialization.json.*
+import model.*
+
+fun ExperimentResult.publicJson(): JsonObject = buildJsonObject {
+    put("name", name); put("expected", expected); put("actual", actual); put("passed", passed)
+}
 
 fun ValidationError.publicJson(): JsonObject = buildJsonObject {
     put("code", code); put("message", message)

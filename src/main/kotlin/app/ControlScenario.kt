@@ -12,9 +12,7 @@ object ControlScenario {
         fun experiment(name: String, expected: String, actual: String, passed: Boolean) {
             val result = ExperimentResult(name, expected, actual, passed)
             results += result
-            session.record("experiment", buildJsonObject {
-                put("name", name); put("expected", expected); put("actual", actual); put("passed", passed)
-            })
+            session.record("experiment", result.publicJson())
         }
         fun code(result: ValidationResult): String = when (result) {
             ValidationResult.Valid -> "VALID"
