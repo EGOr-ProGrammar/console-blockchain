@@ -1,5 +1,5 @@
-import java.util.zip.ZipFile
 import java.io.DataInputStream
+import java.util.zip.ZipFile
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -29,6 +29,21 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.mosaic.testing)
 }
+
+val ktlint by configurations.creating { isCanBeConsumed = false }
+dependencies { ktlint(libs.ktlint.cli) }
+listOf("ktlintCheck", "ktlintFormat").forEach { taskName ->
+    tasks.register<JavaExec>(taskName) {
+        group = "verification"
+        description = if (taskName == "ktlintFormat") "Formats Kotlin sources." else "Checks Kotlin source style."
+        classpath = ktlint
+        mainClass.set("com.pinterest.ktlint.Main")
+        args("--editorconfig=${file("config/ktlint.conf").absolutePath}")
+        if (taskName == "ktlintFormat") args("--format")
+        args(fileTree(projectDir) { include("src/**/*.kt", "*.gradle.kts") }.files.sorted())
+    }
+}
+tasks.check { dependsOn("ktlintCheck") }
 
 // JetBrains' forwarding jar and AndroidX's real runtime share a filename in distributions.
 configurations.configureEach {

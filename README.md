@@ -46,12 +46,19 @@ $env:COLORTERM = 'truecolor'
 
 ```powershell
 .\gradlew.bat test verifyComposeClasspath
+.\gradlew.bat check
+.\gradlew.bat ktlintFormat
 .\gradlew.bat installDist
 .\build\install\console-blockchain\bin\console-blockchain.bat --demo
 .\build\install\console-blockchain\bin\console-blockchain.bat --experiments
 ```
 
 `verifyComposeClasspath` проверяет отсутствие повторяющихся классов Compose и Kotlin metadata новее 2.2 в прикладном и тестовом classpath. Исходники расположены непосредственно в `src/main/kotlin` по пакетам `model`, `crypto`, `ledger`, `consensus`, `report`, `app`, `tui`. Интерфейсы находятся в отдельных файлах; модели сгруппированы по назначению: транзакции, блоки, genesis, снимки состояния, Меркл, проверки и согласование.
+
+`check` запускает тесты и `ktlintCheck`; `ktlintFormat` исправляет форматирование. Правила ktlint 1.7.1 находятся в
+`config/ktlint.conf` и передаются CLI явно: корневой `.editorconfig` содержит только стандартные свойства редактора.
+Проверяются импорты, отступы и пробелы; компактные объявления и wildcard-импорты сохраняются. Линтер обрабатывает
+только `src/**/*.kt` и корневые Gradle-скрипты, без скачанных исходников и результатов сборки.
 
 Для нативной сборки дополнительно нужны **GraalVM для JDK 21**, **MSVC x64** и **Windows SDK**. Эти инструменты нужны только разработчику.
 
