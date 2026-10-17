@@ -10,7 +10,10 @@ data class TransactionBody(
     val nonce: Long,
     val publicKey: PublicKeyHex,
 ) {
-    init { require(amount > 0); require(nonce >= 0) }
+    init {
+        require(amount > 0)
+        require(nonce >= 0)
+    }
 }
 
 @Serializable

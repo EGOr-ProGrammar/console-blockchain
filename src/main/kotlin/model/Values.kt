@@ -5,27 +5,37 @@ import kotlinx.serialization.Serializable
 @Serializable
 @JvmInline
 value class Address(val hex: String) {
-    init { requireHex(hex, 64) }
+    init {
+        requireHex(hex, 64)
+    }
 }
 
 @Serializable
 @JvmInline
 value class Hash256(val hex: String) {
-    init { requireHex(hex, 64) }
+    init {
+        requireHex(hex, 64)
+    }
 
-    companion object { val ZERO = Hash256("0".repeat(64)) }
+    companion object {
+        val ZERO = Hash256("0".repeat(64))
+    }
 }
 
 @Serializable
 @JvmInline
 value class PublicKeyHex(val hex: String) {
-    init { requireHex(hex, 64) }
+    init {
+        requireHex(hex, 64)
+    }
 }
 
 @Serializable
 @JvmInline
 value class SignatureHex(val hex: String) {
-    init { requireHex(hex, 128) }
+    init {
+        requireHex(hex, 128)
+    }
 }
 
 private fun requireHex(value: String, length: Int) {
