@@ -10,9 +10,17 @@ fun BlockHeader.canonicalObject(): JsonObject = buildJsonObject {
     put("merkle_root", merkleRoot.hex)
 }
 
-fun Genesis.canonicalHeader(): JsonObject = JsonObject(block.header.canonicalObject() + mapOf(
-    "allocations" to JsonArray(allocations.map { allocation -> buildJsonObject {
-        put("address", allocation.address.hex)
-        put("amount", allocation.amount)
-    } }),
-))
+fun Genesis.canonicalHeader(): JsonObject = JsonObject(
+    block.header.canonicalObject() +
+        mapOf(
+            "allocations" to
+                JsonArray(
+                    allocations.map { allocation ->
+                        buildJsonObject {
+                            put("address", allocation.address.hex)
+                            put("amount", allocation.amount)
+                        }
+                    },
+                ),
+        ),
+)

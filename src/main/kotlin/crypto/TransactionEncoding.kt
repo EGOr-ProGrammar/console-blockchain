@@ -11,7 +11,10 @@ fun TransactionBody.canonicalObject(): JsonObject = buildJsonObject {
     put("public_key", publicKey.hex)
 }
 
-fun SignedTransaction.canonicalObject(): JsonObject = JsonObject(body.canonicalObject() + mapOf(
-    "tx_id" to JsonPrimitive(txId.hex),
-    "signature" to JsonPrimitive(signature.hex),
-))
+fun SignedTransaction.canonicalObject(): JsonObject = JsonObject(
+    body.canonicalObject() +
+        mapOf(
+            "tx_id" to JsonPrimitive(txId.hex),
+            "signature" to JsonPrimitive(signature.hex),
+        ),
+)

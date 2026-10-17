@@ -6,13 +6,17 @@ object CanonicalJson : CanonicalEncoder {
     override fun encode(value: JsonElement): ByteArray = canonical(value).toString().toByteArray(Charsets.UTF_8)
 
     private fun canonical(value: JsonElement): JsonElement = when (value) {
-        is JsonObject -> JsonObject(value.toSortedMap().mapValues { (key, child) ->
-            requireAscii(key)
-            canonical(child)
-        })
+        is JsonObject ->
+            JsonObject(
+                value.toSortedMap().mapValues { (key, child) ->
+                    requireAscii(key)
+                    canonical(child)
+                },
+            )
         is JsonArray -> JsonArray(value.map(::canonical))
         is JsonPrimitive -> {
             require(value != JsonNull) { "null is outside the canonical domain" }
+
             if (value.isString) {
                 requireAscii(value.content)
             } else {
