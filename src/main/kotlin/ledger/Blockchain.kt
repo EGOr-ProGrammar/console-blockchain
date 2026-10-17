@@ -29,16 +29,14 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
     }
 
     fun submit(transaction: SignedTransaction): SubmissionResult {
-        val snapshot = LedgerSnapshot(ledger.accounts)
         val checks = NodeId.entries.associateWith {
-            val copy = transaction.copy(body = transaction.body.copy())
-            val result = transactionValidator.validate(copy, snapshot)
-            if (result == ValidationResult.Valid && pending.any { it.body.sender == copy.body.sender }) {
+            val result = transactionValidator.validate(transaction, ledger)
+            if (result == ValidationResult.Valid && pending.any { it.body.sender == transaction.body.sender }) {
                 ValidationResult.Invalid(ValidationError("PENDING_SENDER", "Sender already has a pending transaction"))
             } else result
         }
         val result = checks.values.firstOrNull { it is ValidationResult.Invalid } ?: ValidationResult.Valid
-        if (checks.size == 3 && checks.values.all { it == ValidationResult.Valid }) pending += transaction.copy(body = transaction.body.copy())
+        if (result == ValidationResult.Valid) pending += transaction
         return SubmissionResult(transaction, checks, result)
     }
 
@@ -53,7 +51,7 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         val result = DefaultBlockValidator().validate(block, snapshot())
         if (result is BlockValidation.Valid) {
             ledger = result.state
-            chain += block.copy()
+            chain += block
             pending.removeAll { transactionValidator.validate(it, ledger) != ValidationResult.Valid }
         }
         return result
@@ -73,8 +71,6 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         val body = original.body.copy(amount = original.body.amount + 1)
         val changed = original.copy(body = body, txId = JdkCryptography.sha256(CanonicalJson.encode(body.canonicalObject())))
         val transactions = listOf(changed) + pending.drop(1)
-        val header = first.header.copy(merkleRoot = Merkle.build(transactions).root)
-        val third = Block(header, transactions, JdkCryptography.sha256(CanonicalJson.encode(header.canonicalObject())))
-        return listOf(first, second, third)
+        return listOf(first, second, buildCandidate("P1", transactions))
     }
 }

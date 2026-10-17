@@ -57,14 +57,15 @@ class LabSession(root: Path, type: String) {
         return blockchain.submit(transaction).also { recordSubmission("submit", it, before) }
     }
 
-    private fun recordSubmission(operation: String, submission: SubmissionResult, before: JsonObject, input: JsonObject = buildJsonObject { }) {
+    private fun recordSubmission(operation: String, submission: SubmissionResult, before: JsonObject, input: JsonObject = JsonObject(emptyMap())) {
         record(operation, buildJsonObject {
             put("input", input); put("before", before); put("after", state()); put("validation", submission.result.publicJson())
             put("checks", buildJsonObject { submission.checks.forEach { (node, result) -> put(node.name, result.publicJson()) } })
             submission.transaction?.let { tx ->
-                put("transaction", tx.canonicalObject()); put("canonical_body", tx.body.canonicalObject())
-                put("canonical_body_json", CanonicalJson.encode(tx.body.canonicalObject()).decodeToString())
-                put("message_hex", CanonicalJson.encode(tx.body.canonicalObject()).toHex())
+                val body = tx.body.canonicalObject()
+                val bytes = CanonicalJson.encode(body)
+                put("transaction", tx.canonicalObject()); put("canonical_body", body)
+                put("canonical_body_json", bytes.decodeToString()); put("message_hex", bytes.toHex())
             }
         })
     }
@@ -75,14 +76,18 @@ class LabSession(root: Path, type: String) {
             record("merkle", buildJsonObject { put("count", count); put("error", "Select 1–3 available pending records") })
             return null
         }
-        val tree = Merkle.build(pending.take(count))
-        record("merkle", buildJsonObject { put("count", count); put("transactions", JsonArray(pending.take(count).map { it.canonicalObject() })); put("tree", tree.publicJson()) })
+        val transactions = pending.take(count)
+        val tree = Merkle.build(transactions)
+        record("merkle", buildJsonObject {
+            put("count", count); put("transactions", JsonArray(transactions.map { it.canonicalObject() }))
+            put("tree", tree.publicJson())
+        })
         return tree
     }
 
     fun prepareCandidates(): List<Block> {
-        val pending = blockchain.snapshot().pending
-        candidates = when (pending.size) {
+        val snapshot = blockchain.snapshot()
+        candidates = when (snapshot.pending.size) {
             0 -> emptyList()
             3 -> blockchain.conflictCandidates()
             else -> listOf(blockchain.buildCandidate("P1"))
@@ -90,7 +95,7 @@ class LabSession(root: Path, type: String) {
         record("candidates", buildJsonObject {
             put("candidates", JsonArray(candidates.mapIndexed { index, block -> buildJsonObject {
                 put("name", "B${index + 1}"); put("block", block.publicJson())
-                put("validation", DefaultBlockValidator().validate(block, blockchain.snapshot()).publicJson())
+                put("validation", DefaultBlockValidator().validate(block, snapshot).publicJson())
             } }))
             if (candidates.isEmpty()) put("error", "Pending is empty")
         })

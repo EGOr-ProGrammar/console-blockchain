@@ -1,7 +1,7 @@
 package consensus
 
-import model.*
 import ledger.DefaultBlockValidator
+import model.*
 
 class DefaultConsensusEngine : ConsensusEngine {
     override fun run(candidates: List<Block>, snapshot: BlockchainSnapshot, abstainingNodes: Set<NodeId>): ConsensusResult {
@@ -10,8 +10,7 @@ class DefaultConsensusEngine : ConsensusEngine {
         val evaluations = mutableListOf<CandidateEvaluation>()
         val votes = NodeId.entries.map { node ->
             val checks = distinct.map { candidate ->
-                val copy = candidate.copy(transactions = candidate.transactions.map { it.copy(body = it.body.copy()) })
-                CandidateEvaluation(node, copy, validator.validate(copy, snapshot))
+                CandidateEvaluation(node, candidate, validator.validate(candidate, snapshot))
             }
             evaluations += checks
             val preferred = checks.filter { it.result is BlockValidation.Valid }
