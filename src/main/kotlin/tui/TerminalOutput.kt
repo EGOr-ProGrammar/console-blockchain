@@ -7,6 +7,7 @@ internal fun <T> withUtf8Stdout(action: () -> T): T {
     val previous = System.out
     val utf8 = PrintStream(previous, true, Charsets.UTF_8)
     System.setOut(utf8)
+
     return try {
         action()
     } finally {
