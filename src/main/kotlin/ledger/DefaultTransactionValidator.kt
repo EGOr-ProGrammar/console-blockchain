@@ -1,7 +1,7 @@
 package ledger
 
-import model.*
 import crypto.*
+import model.*
 
 class DefaultTransactionValidator : TransactionValidator {
     override fun validate(transaction: SignedTransaction, snapshot: LedgerSnapshot): ValidationResult {

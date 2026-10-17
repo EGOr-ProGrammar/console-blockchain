@@ -1,8 +1,8 @@
 package nativeprobe
 
-import com.jakewharton.mosaic.testing.runMosaicTest
 import com.jakewharton.mosaic.terminal.KeyboardEvent
 import com.jakewharton.mosaic.terminal.Terminal
+import com.jakewharton.mosaic.testing.runMosaicTest
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.*

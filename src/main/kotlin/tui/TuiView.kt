@@ -1,9 +1,8 @@
 package tui
 
-import crypto.canonicalObject
+import kotlinx.serialization.json.*
 import model.*
 import report.*
-import kotlinx.serialization.json.*
 
 enum class Ink { TEXT, MUTED, BORDER, ACCENT, FOCUS, SUCCESS, WAITING, ERROR }
 data class UiSpan(val text: String, val ink: Ink = Ink.TEXT, val surface: Boolean = false, val bold: Boolean = false)

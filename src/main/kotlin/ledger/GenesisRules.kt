@@ -1,7 +1,7 @@
 package ledger
 
-import model.*
 import crypto.*
+import model.*
 
 object GenesisRules {
     fun create(wallets: List<WalletInfo>): Genesis {

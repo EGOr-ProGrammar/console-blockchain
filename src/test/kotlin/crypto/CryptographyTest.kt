@@ -1,7 +1,7 @@
 package crypto
 
-import model.*
 import kotlinx.serialization.json.*
+import model.*
 import org.junit.jupiter.api.Test
 import kotlin.test.*
 

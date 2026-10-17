@@ -1,8 +1,8 @@
 package report
 
-import model.frozenList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import model.frozenList
 import java.nio.file.Path
 
 @Serializable

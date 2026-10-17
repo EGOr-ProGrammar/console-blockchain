@@ -1,10 +1,10 @@
 package app
 
-import model.*
-import report.*
 import kotlinx.serialization.json.*
+import model.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import report.*
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files

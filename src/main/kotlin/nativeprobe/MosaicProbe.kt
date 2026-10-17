@@ -4,9 +4,9 @@ import androidx.compose.runtime.*
 import com.jakewharton.mosaic.LocalTerminalState
 import com.jakewharton.mosaic.layout.onKeyEvent
 import com.jakewharton.mosaic.modifier.Modifier
-import kotlinx.coroutines.awaitCancellation
 import com.jakewharton.mosaic.runMosaicBlocking
 import com.jakewharton.mosaic.ui.Text
+import kotlinx.coroutines.awaitCancellation
 
 fun main() {
     runMosaicBlocking { ProbeScreen {} }

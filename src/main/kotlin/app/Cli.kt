@@ -1,10 +1,10 @@
 package app
 
+import report.WriteResult
+import tui.TuiMain
 import java.io.PrintStream
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
-import report.WriteResult
-import tui.TuiMain
 
 object Cli {
     fun defaultOutputRoot(): Path = Path.of(

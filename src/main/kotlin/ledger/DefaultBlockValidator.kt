@@ -1,7 +1,7 @@
 package ledger
 
-import model.*
 import crypto.*
+import model.*
 
 class DefaultBlockValidator : BlockValidator {
     override fun validate(block: Block, snapshot: BlockchainSnapshot): BlockValidation {

@@ -1,8 +1,8 @@
 package ledger
 
+import consensus.DefaultConsensusEngine
 import crypto.*
 import model.*
-import consensus.DefaultConsensusEngine
 import java.util.Collections
 
 class SubmissionResult(val transaction: SignedTransaction?, checks: Map<NodeId, ValidationResult>, val result: ValidationResult) {

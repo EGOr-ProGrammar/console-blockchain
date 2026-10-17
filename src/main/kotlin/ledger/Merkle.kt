@@ -1,7 +1,7 @@
 package ledger
 
-import model.*
 import crypto.*
+import model.*
 
 object Merkle {
     fun build(transactions: List<SignedTransaction>): MerkleTree {

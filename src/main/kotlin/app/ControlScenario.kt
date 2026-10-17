@@ -1,10 +1,10 @@
 package app
 
-import model.*
-import ledger.*
 import consensus.DefaultConsensusEngine
-import report.*
 import kotlinx.serialization.json.*
+import ledger.*
+import model.*
+import report.*
 
 object ControlScenario {
     fun run(session: LabSession): List<ExperimentResult> {
