@@ -11,12 +11,17 @@ if (-not $GraalVmHome -or -not (Test-Path -LiteralPath (Join-Path $GraalVmHome '
     throw 'Set GRAALVM_HOME to GraalVM for JDK 21 or pass -GraalVmHome.'
 }
 $previousGraalVm = $env:GRAALVM_HOME
+$previousNativeEnvironment = @{ PATH = $env:PATH; INCLUDE = $env:INCLUDE; LIB = $env:LIB }
 Push-Location $repository
 try {
     $env:GRAALVM_HOME = (Resolve-Path -LiteralPath $GraalVmHome).Path
+    if (Test-Path -LiteralPath (Join-Path $repository '.gradle\native-tools\portable-msvc')) {
+        . (Join-Path $PSScriptRoot 'use-local-toolchain.ps1')
+    }
     & .\gradlew.bat test verifyComposeClasspath nativeProbeCompile nativeCompile
     if ($LASTEXITCODE -ne 0) { throw "Native build failed: $LASTEXITCODE" }
 } finally {
     $env:GRAALVM_HOME = $previousGraalVm
+    foreach ($name in $previousNativeEnvironment.Keys) { [Environment]::SetEnvironmentVariable($name, $previousNativeEnvironment[$name], 'Process') }
     Pop-Location
 }
