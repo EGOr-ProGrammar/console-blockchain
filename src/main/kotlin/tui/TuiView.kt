@@ -30,21 +30,7 @@ object TuiView {
         val navWidth = if (columns >= 100) menuColumns else 0
         val workWidth = totalWidth - if (navWidth > 0) navWidth + panelGap else 0
         val split = columns >= 140 && !controller.helpOpen && !controller.menuOpen
-        val snapshot = controller.session.blockchain.snapshot()
-        val wallets = controller.session.blockchain.wallets
-        val headerContent = listOf(
-            line("Высота цепочки: ${snapshot.tip.header.index}    В очереди: ${snapshot.pending.size}    Сумма: ${snapshot.ledger.accounts.values.sumOf { it.balance }}"),
-            UiLine(wallets.flatMapIndexed { index, wallet ->
-                val account = snapshot.ledger.accounts.getValue(wallet.address)
-                listOf(
-                    UiSpan(if (index == 0) "" else "    "),
-                    UiSpan("${wallet.name}: ", Ink.ACCENT, bold = true),
-                    UiSpan(account.balance.toString()),
-                    UiSpan(" (nonce ${account.nextNonce})", Ink.MUTED),
-                )
-            }),
-        )
-        val header = panel("ConsoleBlockchain | Сессия ${controller.session.reports.snapshot().id.take(8)}", headerContent, totalWidth, 4) + line("")
+        val header = header(controller, totalWidth)
         // Leave one terminal row free so the final newline cannot scroll the header away.
         val bodyHeight = rows - header.size - 4 - 1
         val workFocused = !controller.menuOpen && !controller.helpOpen && !controller.detailsOpen
@@ -96,6 +82,29 @@ object TuiView {
         }
         controller.revealFocus = false
         val working = if (navWidth == 0) body else combine(panel("Разделы [F2]", menu(controller, navWidth - 6), navWidth, bodyHeight, active = controller.menuOpen && !controller.helpOpen), body)
+        val footer = footer(controller, totalWidth)
+        return UiFrame((header + working + footer).map { padOuter(it, totalWidth) }, navWidth, split)
+    }
+
+    private fun header(controller: TuiController, totalWidth: Int): List<UiLine> {
+        val snapshot = controller.session.blockchain.snapshot()
+        val wallets = controller.session.blockchain.wallets
+        val headerContent = listOf(
+            line("Высота цепочки: ${snapshot.tip.header.index}    В очереди: ${snapshot.pending.size}    Сумма: ${snapshot.ledger.accounts.values.sumOf { it.balance }}"),
+            UiLine(wallets.flatMapIndexed { index, wallet ->
+                val account = snapshot.ledger.accounts.getValue(wallet.address)
+                listOf(
+                    UiSpan(if (index == 0) "" else "    "),
+                    UiSpan("${wallet.name}: ", Ink.ACCENT, bold = true),
+                    UiSpan(account.balance.toString()),
+                    UiSpan(" (nonce ${account.nextNonce})", Ink.MUTED),
+                )
+            }),
+        )
+        return panel("ConsoleBlockchain | Сессия ${controller.session.reports.snapshot().id.take(8)}", headerContent, totalWidth, 4) + line("")
+    }
+
+    private fun footer(controller: TuiController, totalWidth: Int): List<UiLine> {
         val writeError = controller.session.lastWrite as? WriteResult.Failed
         val status = writeError?.let { "ОШИБКА ЭКСПОРТА: ${it.reason}; результаты в памяти. Журнал → экспорт." } ?: controller.status
         val statusInk = when { status.startsWith("ОШИБКА") || status.startsWith("ОТКАЗ") -> Ink.ERROR; status.startsWith("УСПЕХ") -> Ink.SUCCESS; else -> Ink.WAITING }
@@ -105,21 +114,122 @@ object TuiView {
             controller.detailsOpen -> "Подробности"
             else -> controller.section.title
         }
-        val footer = listOf(
+        return listOf(
             line("─".repeat(totalWidth), Ink.BORDER), line(status, statusInk),
             line("Tab/Shift+Tab  Стрелки  Enter  PgUp/PgDn  F1 помощь  F2 разделы  Esc выход", Ink.MUTED),
             line("Фокус: $focusTarget  |  шагов ${controller.session.reports.snapshot().events.size}  |  прокрутка ${controller.scroll}/${controller.scrollMax}", Ink.MUTED),
         )
-        return UiFrame((header + working + footer).map { padOuter(it, totalWidth) }, navWidth, split)
     }
 
-    private fun content(controller: TuiController, width: Int): List<UiLine> = buildList {
-        val blockchain = controller.session.blockchain
-        val snapshot = blockchain.snapshot()
-        val hasFocus = !controller.menuOpen && !controller.helpOpen && !controller.detailsOpen
-        fun marker(selected: Boolean) = if (selected) if (hasFocus) ">" else "*" else " "
-        fun text(value: String, ink: Ink = Ink.TEXT) { addAll(wrap(value, width).map { line(it, ink) }) }
-        fun action(label: String, index: Int, enabled: Boolean = true) {
+    private fun content(controller: TuiController, width: Int): List<UiLine> = SectionContent(controller, width).build()
+
+    private class SectionContent(private val controller: TuiController, private val width: Int) {
+        private val blockchain = controller.session.blockchain
+        private val snapshot = blockchain.snapshot()
+        private val hasFocus = !controller.menuOpen && !controller.helpOpen && !controller.detailsOpen
+        private val lines = mutableListOf<UiLine>()
+
+        fun build(): List<UiLine> {
+            when (controller.section) {
+                Section.WALLETS -> wallets()
+                Section.SIGNATURES -> signatures()
+                Section.TRANSFERS -> transfers()
+                Section.MERKLE -> merkle()
+                Section.BLOCKS -> blocks()
+                Section.EXPERIMENTS -> experiments()
+                Section.JOURNAL -> journal()
+            }
+
+            return lines.map { fit(it, width) }
+        }
+
+        private fun wallets() {
+            text("Имя    Баланс   nonce  Адрес", Ink.MUTED)
+            blockchain.wallets.forEachIndexed { index, wallet ->
+                val account = snapshot.ledger.accounts.getValue(wallet.address)
+                item("${wallet.name.padEnd(5)} ${account.balance.toString().padEnd(8)} ${account.nextNonce.toString().padEnd(5)} ${wallet.address.hex.take(16)}…", index, 0)
+            }
+            text(""); text("Enter — полный адрес, raw-ключ и состояние.", Ink.MUTED)
+        }
+
+        private fun signatures() {
+            input("Сообщение", controller.originalMessage, 0)
+            input("Изменённое", controller.changedMessage, 1)
+            action("Подписать A и проверить A / изменение / B", 2)
+            action("Полные результаты", 3)
+            text("")
+            val result = controller.details[Section.SIGNATURES] as? JsonObject
+            if (result == null) text("Введите сообщения, затем выберите действие.", Ink.MUTED) else {
+                text("Исходное: ${result["original_valid"]}; изменение: ${result["changed_valid"]}; ключ B: ${result["other_key_valid"]}")
+                text("Ed25519 подписывает исходные UTF-8 байты.", Ink.MUTED)
+            }
+        }
+
+        private fun transfers() {
+            field("Отправитель ←/→", blockchain.wallets[controller.sender].name, 0)
+            field("Получатель ←/→", blockchain.wallets[controller.recipient].name, 1)
+            input("Сумма", controller.amount, 2)
+            action("Подписать и разослать N0/N1/N2", 3)
+            action("Pending — Enter подробности", 4, snapshot.pending.isNotEmpty())
+            text(""); text("Подтверждённый баланс меняется после блока.", Ink.MUTED)
+            if (snapshot.pending.isEmpty()) text("Очередь пуста", Ink.MUTED)
+            snapshot.pending.forEachIndexed { index, tx ->
+                val from = blockchain.wallets.find { it.address == tx.body.sender }?.name
+                val to = blockchain.wallets.find { it.address == tx.body.recipient }?.name
+                item("$from → $to  ${tx.body.amount}  nonce ${tx.body.nonce}  ${tx.txId.hex.take(14)}…", index, 4)
+            }
+        }
+
+        private fun merkle() {
+            field("Число листьев ←/→", controller.leafCount.toString(), 0)
+            action("Рассчитать дерево", 1, controller.leafCount <= snapshot.pending.size)
+            action("Полные уровни", 2)
+            text("")
+            val tree = (controller.details[Section.MERKLE] as? JsonObject)?.get("tree") as? JsonObject
+            if (tree == null) text("Для дерева нужны 1–3 записи в pending.", Ink.MUTED) else {
+                text("Корень: ${tree["root"]?.jsonPrimitive?.content}")
+                tree["levels"]?.jsonArray?.forEach { value ->
+                    val level = value.jsonObject
+                    text("Уровень ${level["level"]}; дублирование: ${level["duplicated_last"]}", Ink.MUTED)
+                    level["hashes"]?.jsonArray?.forEach { text(it.jsonPrimitive.content) }
+                    text("")
+                }
+            }
+        }
+
+        private fun blocks() {
+            action("Сформировать кандидатов", 0, snapshot.pending.isNotEmpty())
+            action("Голосовать и принять", 1, controller.session.candidates.isNotEmpty())
+            action("Раунд с двумя NO_VOTE", 2, controller.session.candidates.isNotEmpty())
+            action("Проверить chain", 3)
+            action("Кандидаты — Enter подробности", 4, controller.session.candidates.isNotEmpty())
+            text("")
+            controller.session.candidates.forEachIndexed { index, block -> item("B${index + 1} ${block.header.producer} ${block.blockHash.hex.take(18)}…", index, 4) }
+            val result = controller.details[Section.BLOCKS] as? JsonObject
+            result?.get("votes")?.jsonArray?.forEach { vote -> text("${vote.jsonObject["node_id"]?.jsonPrimitive?.content}: ${vote.jsonObject["vote"]?.jsonPrimitive?.content}") }
+            if (controller.session.candidates.isEmpty()) text("Для B1/B2/B3 создайте три перевода.", Ink.MUTED)
+        }
+
+        private fun experiments() {
+            action("Запустить в новой сессии", 0)
+            action("Результаты — Enter подробности", 1, controller.experiments.isNotEmpty())
+            text("")
+            if (controller.experiments.isEmpty()) text("13 обязательных и контрольных проверок.", Ink.MUTED)
+            controller.experiments.forEachIndexed { index, result -> item("${if (result.passed) "PASS" else "FAIL"} ${result.name}", index, 1) }
+            controller.experimentDirectory?.let { text(""); text("Материалы: $it", Ink.MUTED) }
+        }
+
+        private fun journal() {
+            input("Каталог экспорта", controller.exportRoot, 1)
+            action("Повторить полный экспорт", 2)
+            text("")
+            text("Журнал — Tab, стрелки, Enter для подробностей", Ink.MUTED)
+            controller.session.reports.snapshot().events.forEachIndexed { index, event -> item("${event.step}. ${event.operation}", index, 0) }
+        }
+
+        private fun marker(selected: Boolean) = if (selected) if (hasFocus) ">" else "*" else " "
+        private fun text(value: String, ink: Ink = Ink.TEXT) { lines.addAll(wrap(value, width).map { line(it, ink) }) }
+        private fun action(label: String, index: Int, enabled: Boolean = true) {
             val listOwnsCursor = controller.itemCount() > 0 && when (controller.section) {
                 Section.TRANSFERS, Section.BLOCKS -> index == 4
                 Section.EXPERIMENTS -> index == 1
@@ -127,106 +237,27 @@ object TuiView {
             }
             val selected = controller.focus == index && !listOwnsCursor
             val ink = if (selected && hasFocus) Ink.FOCUS else if (enabled) Ink.ACCENT else Ink.MUTED
-            add(line("${marker(selected)} [${if (enabled) label else "$label — недоступно"}]", ink, bold = selected && hasFocus, selected = selected))
+            lines.add(line("${marker(selected)} [${if (enabled) label else "$label — недоступно"}]", ink, bold = selected && hasFocus, selected = selected))
         }
-        fun field(label: String, value: String, index: Int) {
+        private fun field(label: String, value: String, index: Int) {
             val selected = controller.focus == index
-            add(line("${marker(selected)} $label: $value", if (selected && hasFocus) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = selected && hasFocus, selected = selected))
+            lines.add(line("${marker(selected)} $label: $value", if (selected && hasFocus) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = selected && hasFocus, selected = selected))
         }
-        fun input(label: String, input: TextInput, index: Int) {
+        private fun input(label: String, input: TextInput, index: Int) {
             val selected = controller.focus == index
             val prefix = "${marker(selected)} $label: "
             val room = (width - prefix.length).coerceAtLeast(1)
             val value = visible(input.value.substring(0, input.cursor)) + if (selected && hasFocus) "|" else ""
             val suffix = visible(input.value.substring(input.cursor))
             val start = (value.length - room + 1).coerceAtLeast(0)
-            add(line(prefix + (value + suffix).drop(start).take(room), if (selected && hasFocus) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = selected && hasFocus, selected = selected))
+            lines.add(line(prefix + (value + suffix).drop(start).take(room), if (selected && hasFocus) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = selected && hasFocus, selected = selected))
         }
-        fun item(value: String, index: Int, focus: Int) {
+        private fun item(value: String, index: Int, focus: Int) {
             val selected = controller.selected == index
             val active = selected && controller.focus == focus && hasFocus
-            add(line("${if (selected) if (active) ">" else "*" else " "} $value", if (active) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = active, selected = selected && controller.focus == focus))
+            lines.add(line("${if (selected) if (active) ">" else "*" else " "} $value", if (active) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = active, selected = selected && controller.focus == focus))
         }
-        when (controller.section) {
-            Section.WALLETS -> {
-                text("Имя    Баланс   nonce  Адрес", Ink.MUTED)
-                blockchain.wallets.forEachIndexed { index, wallet ->
-                    val account = snapshot.ledger.accounts.getValue(wallet.address)
-                    item("${wallet.name.padEnd(5)} ${account.balance.toString().padEnd(8)} ${account.nextNonce.toString().padEnd(5)} ${wallet.address.hex.take(16)}…", index, 0)
-                }
-                text(""); text("Enter — полный адрес, raw-ключ и состояние.", Ink.MUTED)
-            }
-            Section.SIGNATURES -> {
-                input("Сообщение", controller.originalMessage, 0)
-                input("Изменённое", controller.changedMessage, 1)
-                action("Подписать A и проверить A / изменение / B", 2)
-                action("Полные результаты", 3)
-                text("")
-                val result = controller.details[Section.SIGNATURES] as? JsonObject
-                if (result == null) text("Введите сообщения, затем выберите действие.", Ink.MUTED) else {
-                    text("Исходное: ${result["original_valid"]}; изменение: ${result["changed_valid"]}; ключ B: ${result["other_key_valid"]}")
-                    text("Ed25519 подписывает исходные UTF-8 байты.", Ink.MUTED)
-                }
-            }
-            Section.TRANSFERS -> {
-                field("Отправитель ←/→", blockchain.wallets[controller.sender].name, 0)
-                field("Получатель ←/→", blockchain.wallets[controller.recipient].name, 1)
-                input("Сумма", controller.amount, 2)
-                action("Подписать и разослать N0/N1/N2", 3)
-                action("Pending — Enter подробности", 4, snapshot.pending.isNotEmpty())
-                text(""); text("Подтверждённый баланс меняется после блока.", Ink.MUTED)
-                if (snapshot.pending.isEmpty()) text("Очередь пуста", Ink.MUTED)
-                snapshot.pending.forEachIndexed { index, tx ->
-                    val from = blockchain.wallets.find { it.address == tx.body.sender }?.name
-                    val to = blockchain.wallets.find { it.address == tx.body.recipient }?.name
-                    item("$from → $to  ${tx.body.amount}  nonce ${tx.body.nonce}  ${tx.txId.hex.take(14)}…", index, 4)
-                }
-            }
-            Section.MERKLE -> {
-                field("Число листьев ←/→", controller.leafCount.toString(), 0)
-                action("Рассчитать дерево", 1, controller.leafCount <= snapshot.pending.size)
-                action("Полные уровни", 2)
-                text("")
-                val tree = (controller.details[Section.MERKLE] as? JsonObject)?.get("tree") as? JsonObject
-                if (tree == null) text("Для дерева нужны 1–3 записи в pending.", Ink.MUTED) else {
-                    text("Корень: ${tree["root"]?.jsonPrimitive?.content}")
-                    tree["levels"]?.jsonArray?.forEach { value ->
-                        val level = value.jsonObject
-                        text("Уровень ${level["level"]}; дублирование: ${level["duplicated_last"]}", Ink.MUTED)
-                        level["hashes"]?.jsonArray?.forEach { text(it.jsonPrimitive.content) }
-                        text("")
-                    }
-                }
-            }
-            Section.BLOCKS -> {
-                action("Сформировать кандидатов", 0, snapshot.pending.isNotEmpty())
-                action("Голосовать и принять", 1, controller.session.candidates.isNotEmpty())
-                action("Раунд с двумя NO_VOTE", 2, controller.session.candidates.isNotEmpty())
-                action("Проверить chain", 3)
-                action("Кандидаты — Enter подробности", 4, controller.session.candidates.isNotEmpty())
-                text("")
-                controller.session.candidates.forEachIndexed { index, block -> item("B${index + 1} ${block.header.producer} ${block.blockHash.hex.take(18)}…", index, 4) }
-                val result = controller.details[Section.BLOCKS] as? JsonObject
-                result?.get("votes")?.jsonArray?.forEach { vote -> text("${vote.jsonObject["node_id"]?.jsonPrimitive?.content}: ${vote.jsonObject["vote"]?.jsonPrimitive?.content}") }
-                if (controller.session.candidates.isEmpty()) text("Для B1/B2/B3 создайте три перевода.", Ink.MUTED)
-            }
-            Section.EXPERIMENTS -> {
-                action("Запустить в новой сессии", 0)
-                action("Результаты — Enter подробности", 1, controller.experiments.isNotEmpty())
-                text("")
-                if (controller.experiments.isEmpty()) text("13 обязательных и контрольных проверок.", Ink.MUTED)
-                controller.experiments.forEachIndexed { index, result -> item("${if (result.passed) "PASS" else "FAIL"} ${result.name}", index, 1) }
-                controller.experimentDirectory?.let { text(""); text("Материалы: $it", Ink.MUTED) }
-            }
-            Section.JOURNAL -> {
-                input("Каталог экспорта", controller.exportRoot, 1)
-                action("Повторить полный экспорт", 2)
-                text("")
-                text("Журнал — Tab, стрелки, Enter для подробностей", Ink.MUTED)
-                controller.session.reports.snapshot().events.forEachIndexed { index, event -> item("${event.step}. ${event.operation}", index, 0) }
-            }
-        }
-    }.map { fit(it, width) }
+    }
 
     private fun menu(controller: TuiController, width: Int): List<UiLine> = Section.entries.mapIndexed { index, section ->
         val selected = index == if (controller.menuOpen) controller.menuSelection else controller.section.ordinal
