@@ -45,4 +45,21 @@ class ModelsTest {
         assertFailsWith<UnsupportedOperationException> { (block.transactions as MutableList).clear() }
         assertFailsWith<UnsupportedOperationException> { (snapshot.chain as MutableList).clear() }
     }
+
+    @Test
+    fun `Merkle and consensus models copy caller collections too`() {
+        val hashes = mutableListOf(Hash256.ZERO)
+        val level = MerkleLevel(hashes, false)
+        val levels = mutableListOf(level)
+        val tree = MerkleTree(levels, Hash256.ZERO)
+        val votes = mutableListOf(Vote(NodeId.N0, null))
+        val evaluations = mutableListOf<CandidateEvaluation>()
+        val result = ConsensusResult(evaluations, votes, null)
+        hashes.clear(); levels.clear(); votes.clear()
+        assertEquals(1, tree.levels.size)
+        assertEquals(1, level.hashes.size)
+        assertEquals(1, result.votes.size)
+        assertFailsWith<UnsupportedOperationException> { (result.votes as MutableList).clear() }
+        assertFailsWith<UnsupportedOperationException> { (tree.levels as MutableList).clear() }
+    }
 }

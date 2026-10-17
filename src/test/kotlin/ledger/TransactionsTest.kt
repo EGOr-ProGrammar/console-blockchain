@@ -26,6 +26,7 @@ class TransactionsTest {
         assertEquals(ValidationResult.Valid, result.result)
         assertEquals(NodeId.entries.toSet(), result.checks.keys)
         assertTrue(result.checks.values.all { it == ValidationResult.Valid })
+        assertFailsWith<UnsupportedOperationException> { (result.checks as MutableMap).clear() }
         assertEquals(listOf(result.transaction), blockchain.snapshot().pending)
         assertEquals(before.ledger.accounts, blockchain.snapshot().ledger.accounts)
         assertEquals(0L, blockchain.snapshot().ledger.accounts.getValue(a.address).nextNonce)

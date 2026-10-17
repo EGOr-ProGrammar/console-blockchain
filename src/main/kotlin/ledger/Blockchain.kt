@@ -3,8 +3,11 @@ package ledger
 import crypto.*
 import model.*
 import consensus.DefaultConsensusEngine
+import java.util.Collections
 
-data class SubmissionResult(val transaction: SignedTransaction?, val checks: Map<NodeId, ValidationResult>, val result: ValidationResult)
+class SubmissionResult(val transaction: SignedTransaction?, checks: Map<NodeId, ValidationResult>, val result: ValidationResult) {
+    val checks: Map<NodeId, ValidationResult> = Collections.unmodifiableMap(LinkedHashMap(checks))
+}
 
 class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
     val wallets: List<WalletInfo> = frozenList(listOf("A", "B", "C").map(signer::createWallet))

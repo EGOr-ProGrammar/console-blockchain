@@ -21,6 +21,6 @@ class DefaultConsensusEngine : ConsensusEngine {
         val winnerHash = votes.mapNotNull { it.blockHash }.groupingBy { it }.eachCount().entries
             .firstOrNull { it.value >= 2 }?.key
         val winner = evaluations.firstOrNull { it.result is BlockValidation.Valid && it.block.blockHash == winnerHash }?.block
-        return ConsensusResult(frozenList(evaluations), frozenList(votes), winner)
+        return ConsensusResult(evaluations, votes, winner)
     }
 }

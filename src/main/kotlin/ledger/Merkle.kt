@@ -11,10 +11,10 @@ object Merkle {
         while (hashes.size > 1) {
             val duplicate = hashes.size % 2 != 0
             val padded = if (duplicate) hashes + hashes.last() else hashes
-            levels += MerkleLevel(frozenList(padded), duplicate)
+            levels += MerkleLevel(padded, duplicate)
             hashes = padded.chunked(2).map { (left, right) -> JdkCryptography.sha256(left.hex.hexBytes() + right.hex.hexBytes()) }
         }
-        levels += MerkleLevel(frozenList(hashes), false)
-        return MerkleTree(frozenList(levels), hashes.single())
+        levels += MerkleLevel(hashes, false)
+        return MerkleTree(levels, hashes.single())
     }
 }

@@ -67,11 +67,13 @@ class BlockchainSnapshot(
     val tip: Block get() = chain.last()
 }
 
-@Serializable
-data class MerkleLevel(val hashes: List<Hash256>, val duplicatedLast: Boolean)
+class MerkleLevel(hashes: List<Hash256>, val duplicatedLast: Boolean) {
+    val hashes: List<Hash256> = frozenList(hashes)
+}
 
-@Serializable
-data class MerkleTree(val levels: List<MerkleLevel>, val root: Hash256)
+class MerkleTree(levels: List<MerkleLevel>, val root: Hash256) {
+    val levels: List<MerkleLevel> = frozenList(levels)
+}
 
 @Serializable
 data class ValidationError(val code: String, val message: String, val transactionIndex: Int? = null, val blockIndex: Long? = null)
@@ -97,7 +99,9 @@ data class Vote(val nodeId: NodeId, val blockHash: Hash256?)
 
 data class CandidateEvaluation(val nodeId: NodeId, val block: Block, val result: BlockValidation)
 
-class ConsensusResult(val evaluations: List<CandidateEvaluation>, val votes: List<Vote>, val winner: Block?) {
+class ConsensusResult(evaluations: List<CandidateEvaluation>, votes: List<Vote>, val winner: Block?) {
+    val evaluations: List<CandidateEvaluation> = frozenList(evaluations)
+    val votes: List<Vote> = frozenList(votes)
     val status: String get() = if (winner == null) "NO_QUORUM" else "ACCEPTED"
 }
 
