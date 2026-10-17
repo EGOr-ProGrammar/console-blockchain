@@ -39,4 +39,20 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
     }
 
     private fun failure(code: String, message: String) = SubmissionResult(null, emptyMap(), ValidationResult.Invalid(ValidationError(code, message)))
+
+    fun buildCandidate(producer: String, transactions: List<SignedTransaction> = snapshot().pending): Block {
+        val header = BlockHeader(Math.addExact(chain.last().header.index, 1), chain.last().blockHash, producer, Merkle.build(transactions).root)
+        return Block(header, transactions, JdkCryptography.sha256(CanonicalJson.encode(header.canonicalObject())))
+    }
+
+    internal fun commit(block: Block): BlockValidation {
+        val result = DefaultBlockValidator().validate(block, snapshot())
+        if (result is BlockValidation.Valid) {
+            ledger = result.state
+            chain += block.copy()
+            val included = block.transactions.map { it.txId }.toSet()
+            pending.removeAll { it.txId in included }
+        }
+        return result
+    }
 }
