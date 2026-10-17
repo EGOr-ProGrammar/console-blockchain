@@ -44,8 +44,14 @@ application {
 }
 
 graalvmNative {
+    toolchainDetection.set(false)
     binaries.named("main") {
         imageName = "ConsoleBlockchain"
+        buildArgs.add("--no-fallback")
+    }
+    binaries.create("probe") {
+        mainClass.set("nativeprobe.MosaicProbeKt")
+        imageName.set("MosaicProbe")
         buildArgs.add("--no-fallback")
     }
 }

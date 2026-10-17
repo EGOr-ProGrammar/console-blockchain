@@ -1,0 +1,8 @@
+{
+  "resources": {
+    "includes": [
+      { "pattern": "\\Qcom/jakewharton/mosaic/tty/jni/amd64/mosaic.dll\\E" },
+      { "pattern": "\\Qbuild-info.properties\\E" }
+    ]
+  }
+}
