@@ -16,6 +16,18 @@ class ScenariosTest {
     private val experiments = setOf("message_signature", "tampered_amount", "invalid_amount", "overspend", "replay", "pending_sender", "merkle_1_2_3", "transaction_order", "damaged_chain", "candidate_conflict", "proposal_order", "no_quorum", "control_balances")
 
     @Test
+    fun `each scenario invocation returns only its own experiment results`() {
+        val scenario = ControlScenario(LabSession(root, "experiments"))
+        val first = scenario.run()
+        val second = scenario.run()
+
+        assertEquals(13, first.size)
+        assertEquals(13, second.size)
+        assertEquals(experiments, first.map { it.name }.toSet())
+        assertEquals(experiments, second.map { it.name }.toSet())
+    }
+
+    @Test
     fun `both headless modes export complete evidence and expected control balances without secrets`() {
         val output = ByteArrayOutputStream()
         for (mode in listOf("--demo", "--experiments")) {

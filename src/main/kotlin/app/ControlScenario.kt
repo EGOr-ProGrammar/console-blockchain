@@ -12,6 +12,8 @@ class ControlScenario(private val session: LabSession) {
     private val results = mutableListOf<ExperimentResult>()
 
     fun run(): List<ExperimentResult> {
+        results.clear()
+
         verifyMessageSignature()
         verifyInvalidAmounts()
         verifyOverspend()
