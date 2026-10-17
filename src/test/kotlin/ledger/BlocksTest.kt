@@ -98,4 +98,20 @@ class BlocksTest {
         assertEquals(before.pending.drop(1), blockchain.snapshot().pending)
         assertEquals(90L, blockchain.snapshot().ledger.accounts.getValue(wallets[0].address).balance)
     }
+
+    @Test
+    fun `accepted alternative transaction evicts stale nonce but preserves other pending senders`() {
+        seed()
+        val before = blockchain.snapshot()
+        val original = before.pending.first()
+        val body = original.body.copy(amount = 11)
+        val bytes = CanonicalJson.encode(body.canonicalObject())
+        val alternative = SignedTransaction(body, JdkCryptography.sha256(bytes), blockchain.signer.sign(body.sender, bytes))
+
+        assertNotNull(blockchain.resolve(listOf(blockchain.buildCandidate("P1", listOf(alternative)))).winner)
+
+        assertEquals(before.pending.drop(1), blockchain.snapshot().pending)
+        assertEquals(ValidationResult.Valid, blockchain.createTransfer(wallets[0].address, wallets[1].address, "1").result)
+        assertEquals(1L, blockchain.snapshot().pending.last().body.nonce)
+    }
 }

@@ -54,8 +54,7 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         if (result is BlockValidation.Valid) {
             ledger = result.state
             chain += block.copy()
-            val included = block.transactions.map { it.txId }.toSet()
-            pending.removeAll { it.txId in included }
+            pending.removeAll { transactionValidator.validate(it, ledger) != ValidationResult.Valid }
         }
         return result
     }
