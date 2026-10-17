@@ -49,7 +49,7 @@ object Cli {
             return TuiMain.run(root, err)
         }
         val session = LabSession(root, mode)
-        val results = ControlScenario.run(session)
+        val results = ControlScenario(session).run()
         results.forEach { out.println("${if (it.passed) "PASS" else "FAIL"} ${it.name}: ${it.actual}") }
         out.println("Materials: ${session.reports.directory.toAbsolutePath()}")
         val saved = session.export()

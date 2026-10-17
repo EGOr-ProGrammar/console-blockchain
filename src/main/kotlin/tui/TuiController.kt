@@ -353,7 +353,7 @@ class TuiController(val outputRoot: Path) {
     private fun runExperiments() {
         val experimentSession = LabSession(session.reports.directory.toAbsolutePath().parent, "experiments")
         experimentSessions += experimentSession
-        experiments = ControlScenario.run(experimentSession)
+        experiments = ControlScenario(experimentSession).run()
         experimentDirectory = experimentSession.reports.directory
         session.record("experiments_launched", buildJsonObject {
             put("session_id", experimentSession.reports.snapshot().id)
