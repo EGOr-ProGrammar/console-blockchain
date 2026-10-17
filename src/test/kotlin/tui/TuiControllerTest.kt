@@ -10,8 +10,11 @@ import java.nio.file.Path
 import kotlin.test.*
 
 class TuiControllerTest {
-    @TempDir lateinit var root: Path
-    private fun TuiController.key(name: String, shift: Boolean = false, ctrl: Boolean = false) = handle(KeyEvent(name, shift = shift, ctrl = ctrl))
+    @TempDir
+    lateinit var root: Path
+    private fun TuiController.key(name: String, shift: Boolean = false, ctrl: Boolean = false) =
+        handle(KeyEvent(name, shift = shift, ctrl = ctrl))
+
     private fun TuiController.choose(target: Section) {
         key("F2")
         repeat((target.ordinal - section.ordinal + Section.entries.size) % Section.entries.size) { key("ArrowDown") }
@@ -34,7 +37,9 @@ class TuiControllerTest {
         val directories = Files.list(retryRoot).use { it.toList() }
         assertEquals(2, directories.size)
         val experiments = Files.readAllLines(controller.experimentDirectory!!.resolve("events.jsonl"))
-        assertEquals(13, experiments.count { Json.parseToJsonElement(it).jsonObject["operation"]?.jsonPrimitive?.content == "experiment" })
+        assertEquals(
+            13,
+            experiments.count { Json.parseToJsonElement(it).jsonObject["operation"]?.jsonPrimitive?.content == "experiment" })
     }
 
     @Test
@@ -113,7 +118,9 @@ class TuiControllerTest {
         val snapshot = controller.session.blockchain.snapshot()
         assertEquals(2, snapshot.chain.size)
         assertTrue(snapshot.pending.isEmpty())
-        assertEquals(listOf(95L, 90L, 115L), controller.session.blockchain.wallets.map { snapshot.ledger.accounts.getValue(it.address).balance })
+        assertEquals(
+            listOf(95L, 90L, 115L),
+            controller.session.blockchain.wallets.map { snapshot.ledger.accounts.getValue(it.address).balance })
     }
 
     @Test
@@ -149,7 +156,8 @@ class TuiControllerTest {
         val experimental = directories.single {
             Json.parseToJsonElement(Files.readString(it.resolve("metadata.json"))).jsonObject["session_type"]?.jsonPrimitive?.content == "experiments"
         }
-        val events = Files.readAllLines(experimental.resolve("events.jsonl")).map { Json.parseToJsonElement(it).jsonObject }
+        val events =
+            Files.readAllLines(experimental.resolve("events.jsonl")).map { Json.parseToJsonElement(it).jsonObject }
         assertEquals(13, events.count { it["operation"]?.jsonPrimitive?.content == "experiment" })
         assertTrue(events.any { it["operation"]?.jsonPrimitive?.content == "candidates" })
     }

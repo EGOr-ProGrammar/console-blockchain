@@ -7,7 +7,13 @@ import kotlin.test.*
 
 class ConsensusTest {
     private val blockchain = Blockchain().apply {
-        listOf("10", "20", "5").forEachIndexed { i, amount -> createTransfer(wallets[i].address, wallets[(i + 1) % 3].address, amount) }
+        listOf("10", "20", "5").forEachIndexed { i, amount ->
+            createTransfer(
+                wallets[i].address,
+                wallets[(i + 1) % 3].address,
+                amount
+            )
+        }
     }
     private val engine = DefaultConsensusEngine()
 
@@ -16,7 +22,10 @@ class ConsensusTest {
         val candidates = blockchain.conflictCandidates()
         val validator = DefaultBlockValidator()
         candidates.take(2).forEach { assertIs<BlockValidation.Valid>(validator.validate(it, blockchain.snapshot())) }
-        assertEquals("SIGNATURE", assertIs<BlockValidation.Invalid>(validator.validate(candidates[2], blockchain.snapshot())).error.code)
+        assertEquals(
+            "SIGNATURE",
+            assertIs<BlockValidation.Invalid>(validator.validate(candidates[2], blockchain.snapshot())).error.code
+        )
         val before = blockchain.snapshot()
         val result = engine.run(candidates, before)
         val expected = candidates.take(2).minBy { it.blockHash.hex }.blockHash
@@ -60,7 +69,9 @@ class ConsensusTest {
         assertEquals(2, blockchain.snapshot().chain.size)
         assertEquals(result.winner?.blockHash, blockchain.snapshot().tip.blockHash)
         assertTrue(blockchain.snapshot().pending.isEmpty())
-        assertEquals(listOf(95L, 90L, 115L), blockchain.wallets.map { blockchain.snapshot().ledger.accounts.getValue(it.address).balance })
+        assertEquals(
+            listOf(95L, 90L, 115L),
+            blockchain.wallets.map { blockchain.snapshot().ledger.accounts.getValue(it.address).balance })
         assertEquals("NO_QUORUM", blockchain.resolve(candidates).status)
         assertEquals(2, blockchain.snapshot().chain.size)
     }

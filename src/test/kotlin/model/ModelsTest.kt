@@ -29,7 +29,13 @@ class ModelsTest {
     fun `snapshots and blocks own immutable copies of caller collections`() {
         val accounts = mutableMapOf(a to AccountState(100, 0))
         val ledger = LedgerSnapshot(accounts)
-        val transactions = mutableListOf(SignedTransaction(TransactionBody(a, b, 1, 0, key), Hash256.ZERO, SignatureHex("0".repeat(128))))
+        val transactions = mutableListOf(
+            SignedTransaction(
+                TransactionBody(a, b, 1, 0, key),
+                Hash256.ZERO,
+                SignatureHex("0".repeat(128))
+            )
+        )
         val block = Block(header, transactions, Hash256.ZERO)
         val allocations = mutableListOf(Allocation(a, 100))
         val genesis = Genesis(Block(header, emptyList(), Hash256.ZERO), allocations)

@@ -8,8 +8,17 @@ import java.nio.file.Path
 import kotlin.test.*
 
 class FileReportStoreTest {
-    @TempDir lateinit var root: Path
-    private val required = setOf("metadata.json", "events.jsonl", "journal.txt", "summary.md", "candidates.csv", "balances.csv", "experiments.csv")
+    @TempDir
+    lateinit var root: Path
+    private val required = setOf(
+        "metadata.json",
+        "events.jsonl",
+        "journal.txt",
+        "summary.md",
+        "candidates.csv",
+        "balances.csv",
+        "experiments.csv"
+    )
 
     @Test
     fun `each operation writes complete materials and independent sessions never overwrite`() {
@@ -19,8 +28,11 @@ class FileReportStoreTest {
         assertEquals(WriteResult.Saved, second.record("created", buildJsonObject { put("reason", "ok") }))
         assertNotEquals(first.directory, second.directory)
         for (store in listOf(first, second)) {
-            assertEquals(required, Files.list(store.directory).use { entries -> entries.map { it.fileName.toString() }.toList().toSet() })
-            val metadata = Json.parseToJsonElement(Files.readString(store.directory.resolve("metadata.json"))).jsonObject
+            assertEquals(
+                required,
+                Files.list(store.directory).use { entries -> entries.map { it.fileName.toString() }.toList().toSet() })
+            val metadata =
+                Json.parseToJsonElement(Files.readString(store.directory.resolve("metadata.json"))).jsonObject
             assertEquals(store.snapshot().id, metadata.getValue("session_id").jsonPrimitive.content)
             assertTrue(metadata.containsKey("versions"))
             val lines = Files.readAllLines(store.directory.resolve("events.jsonl"))
@@ -56,7 +68,10 @@ class FileReportStoreTest {
             put("passed", true)
         })
         for (name in listOf("candidates.csv", "balances.csv", "experiments.csv")) {
-            assertContentEquals(byteArrayOf(-17, -69, -65), Files.readAllBytes(store.directory.resolve(name)).take(3).toByteArray())
+            assertContentEquals(
+                byteArrayOf(-17, -69, -65),
+                Files.readAllBytes(store.directory.resolve(name)).take(3).toByteArray()
+            )
         }
         val csv = Files.readString(store.directory.resolve("experiments.csv"))
         assertTrue(csv.contains("\"quoted, \"\"value\"\"\nnext\""))
@@ -67,7 +82,20 @@ class FileReportStoreTest {
     @Test
     fun `CSV neutralizes spreadsheet formulas while JSON keeps original public data`() {
         val store = FileReportStore(root, "experiments")
-        val inputs = listOf("=1+1", "+1+1", "-1+1", "@SUM(1)", "\t=1+1", "\r=1+1", "\n=1+1", "  =1+1", "＝1+1", "＋1+1", "－1+1", "＠SUM(1)")
+        val inputs = listOf(
+            "=1+1",
+            "+1+1",
+            "-1+1",
+            "@SUM(1)",
+            "\t=1+1",
+            "\r=1+1",
+            "\n=1+1",
+            "  =1+1",
+            "＝1+1",
+            "＋1+1",
+            "－1+1",
+            "＠SUM(1)"
+        )
         for (input in inputs) {
             assertEquals(WriteResult.Saved, store.record("experiment", buildJsonObject {
                 put("name", input); put("expected", "text"); put("actual", input); put("passed", true)
@@ -76,6 +104,8 @@ class FileReportStoreTest {
         val csv = Files.readString(store.directory.resolve("experiments.csv"))
         for (input in inputs) assertTrue(csv.contains("\"\t$input\""), input)
         val events = Files.readAllLines(store.directory.resolve("events.jsonl"))
-        assertEquals(inputs, events.map { Json.parseToJsonElement(it).jsonObject.getValue("result").jsonObject.getValue("name").jsonPrimitive.content })
+        assertEquals(
+            inputs,
+            events.map { Json.parseToJsonElement(it).jsonObject.getValue("result").jsonObject.getValue("name").jsonPrimitive.content })
     }
 }

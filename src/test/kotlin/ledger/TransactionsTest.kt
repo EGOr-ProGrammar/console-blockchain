@@ -46,7 +46,11 @@ class TransactionsTest {
 
     @Test
     fun `overspend same address and unknown addresses are rejected with complete node results`() {
-        for ((tx, expected) in listOf(transaction(101) to "BALANCE", transaction(recipient = a.address) to "ADDRESS", transaction(recipient = Address("0".repeat(64))) to "ADDRESS")) {
+        for ((tx, expected) in listOf(
+            transaction(101) to "BALANCE",
+            transaction(recipient = a.address) to "ADDRESS",
+            transaction(recipient = Address("0".repeat(64))) to "ADDRESS"
+        )) {
             val result = blockchain.submit(tx)
             assertEquals(3, result.checks.size)
             assertTrue(result.checks.values.all { code(it) == expected })
@@ -60,11 +64,18 @@ class TransactionsTest {
         val tx = transaction()
         val snapshot = blockchain.snapshot().ledger
         assertEquals(ValidationResult.Valid, validator.validate(tx, snapshot))
-        assertEquals("SENDER_KEY", code(validator.validate(tx.copy(body = tx.body.copy(publicKey = b.publicKey)), snapshot)))
+        assertEquals(
+            "SENDER_KEY",
+            code(validator.validate(tx.copy(body = tx.body.copy(publicKey = b.publicKey)), snapshot))
+        )
         assertEquals("TX_ID", code(validator.validate(tx.copy(txId = Hash256.ZERO), snapshot)))
-        assertEquals("SIGNATURE", code(validator.validate(tx.copy(signature = SignatureHex("0".repeat(128))), snapshot)))
+        assertEquals(
+            "SIGNATURE",
+            code(validator.validate(tx.copy(signature = SignatureHex("0".repeat(128))), snapshot))
+        )
         val tampered = tx.copy(body = tx.body.copy(amount = 11))
-        val rehashed = tampered.copy(txId = JdkCryptography.sha256(CanonicalJson.encode(tampered.body.canonicalObject())))
+        val rehashed =
+            tampered.copy(txId = JdkCryptography.sha256(CanonicalJson.encode(tampered.body.canonicalObject())))
         assertEquals("SIGNATURE", code(validator.validate(rehashed, snapshot)))
         assertEquals("NONCE", code(validator.validate(transaction(nonce = 1), snapshot)))
         val confirmed = LedgerSnapshot(snapshot.accounts + (a.address to AccountState(90, 1)))

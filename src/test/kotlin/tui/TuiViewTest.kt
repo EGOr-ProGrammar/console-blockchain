@@ -7,7 +7,8 @@ import java.nio.file.Path
 import kotlin.test.*
 
 class TuiViewTest {
-    @TempDir lateinit var root: Path
+    @TempDir
+    lateinit var root: Path
 
     @Test
     fun `only the panel receiving keys has a highlighted cursor and focus border`() {

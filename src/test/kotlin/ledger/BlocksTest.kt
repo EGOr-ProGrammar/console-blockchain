@@ -12,7 +12,10 @@ class BlocksTest {
 
     private fun seed() {
         listOf(10L, 20L, 5L).forEachIndexed { i, amount ->
-            assertEquals(ValidationResult.Valid, blockchain.createTransfer(wallets[i].address, wallets[(i + 1) % 3].address, amount.toString()).result)
+            assertEquals(
+                ValidationResult.Valid,
+                blockchain.createTransfer(wallets[i].address, wallets[(i + 1) % 3].address, amount.toString()).result
+            )
         }
     }
 
@@ -22,7 +25,10 @@ class BlocksTest {
     }
 
     private fun invalid(block: Block, code: String) {
-        assertEquals(code, assertIs<BlockValidation.Invalid>(validator.validate(block, blockchain.snapshot())).error.code)
+        assertEquals(
+            code,
+            assertIs<BlockValidation.Invalid>(validator.validate(block, blockchain.snapshot())).error.code
+        )
     }
 
     @Test
@@ -44,7 +50,10 @@ class BlocksTest {
         assertIs<BlockValidation.Invalid>(blockchain.commit(candidate))
         assertEquals(2, blockchain.snapshot().chain.size)
         assertEquals(300L, blockchain.snapshot().ledger.accounts.values.sumOf { it.balance })
-        assertEquals("NONCE", assertIs<ValidationResult.Invalid>(blockchain.submit(candidate.transactions.first()).result).error.code)
+        assertEquals(
+            "NONCE",
+            assertIs<ValidationResult.Invalid>(blockchain.submit(candidate.transactions.first()).result).error.code
+        )
     }
 
     @Test
@@ -53,7 +62,10 @@ class BlocksTest {
         val candidate = blockchain.buildCandidate("P1")
         invalid(candidate.copy(transactions = emptyList()), "SIZE")
         invalid(candidate.copy(transactions = candidate.transactions + candidate.transactions.first()), "SIZE")
-        invalid(candidate.copy(transactions = listOf(candidate.transactions.first(), candidate.transactions.first())), "DUPLICATE_TX")
+        invalid(
+            candidate.copy(transactions = listOf(candidate.transactions.first(), candidate.transactions.first())),
+            "DUPLICATE_TX"
+        )
         invalid(candidate.copy(header = candidate.header.copy(index = 2)), "INDEX")
         invalid(candidate.copy(header = candidate.header.copy(prevHash = Hash256.ZERO)), "PREV_HASH")
         invalid(candidate.copy(header = candidate.header.copy(merkleRoot = Hash256.ZERO)), "MERKLE_ROOT")
@@ -77,12 +89,15 @@ class BlocksTest {
 
     @Test
     fun `sequential validation permits spending funds received earlier in same block`() {
-        val a = wallets[0]; val b = wallets[1]; val c = wallets[2]
+        val a = wallets[0];
+        val b = wallets[1];
+        val c = wallets[2]
         fun signed(sender: WalletInfo, recipient: WalletInfo, amount: Long): SignedTransaction {
             val body = TransactionBody(sender.address, recipient.address, amount, 0, sender.publicKey)
             val bytes = CanonicalJson.encode(body.canonicalObject())
             return SignedTransaction(body, JdkCryptography.sha256(bytes), blockchain.signer.sign(sender.address, bytes))
         }
+
         val transactions = listOf(signed(a, b, 100), signed(b, c, 200))
         val block = blockchain.buildCandidate("P1", transactions)
         val state = assertIs<BlockValidation.Valid>(validator.validate(block, blockchain.snapshot())).state
@@ -106,12 +121,16 @@ class BlocksTest {
         val original = before.pending.first()
         val body = original.body.copy(amount = 11)
         val bytes = CanonicalJson.encode(body.canonicalObject())
-        val alternative = SignedTransaction(body, JdkCryptography.sha256(bytes), blockchain.signer.sign(body.sender, bytes))
+        val alternative =
+            SignedTransaction(body, JdkCryptography.sha256(bytes), blockchain.signer.sign(body.sender, bytes))
 
         assertNotNull(blockchain.resolve(listOf(blockchain.buildCandidate("P1", listOf(alternative)))).winner)
 
         assertEquals(before.pending.drop(1), blockchain.snapshot().pending)
-        assertEquals(ValidationResult.Valid, blockchain.createTransfer(wallets[0].address, wallets[1].address, "1").result)
+        assertEquals(
+            ValidationResult.Valid,
+            blockchain.createTransfer(wallets[0].address, wallets[1].address, "1").result
+        )
         assertEquals(1L, blockchain.snapshot().pending.last().body.nonce)
     }
 }

@@ -12,14 +12,19 @@ import java.nio.file.Path
 import kotlin.test.*
 
 class BlockchainScreenTest {
-    @TempDir lateinit var root: Path
+    @TempDir
+    lateinit var root: Path
 
     @Test
     fun `Mosaic routes menu focus input resize validation and exit without losing form`() = runTest {
         runMosaicTest {
             val controller = TuiController(root)
             var exited = false
-            assertTrue(setContentAndSnapshot { BlockchainScreen(controller, onExit = { exited = true }) }.contains("Кошельки"))
+            assertTrue(setContentAndSnapshot {
+                BlockchainScreen(
+                    controller,
+                    onExit = { exited = true })
+            }.contains("Кошельки"))
             sendKeyEvent(KeyboardEvent(KeyboardEvent.F2)); assertTrue(awaitSnapshot().contains("Разделы"))
             repeat(2) { sendKeyEvent(KeyboardEvent(KeyboardEvent.Down)) }
             sendKeyEvent(KeyboardEvent(13)); awaitSnapshot()

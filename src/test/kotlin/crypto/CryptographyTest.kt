@@ -9,12 +9,25 @@ class CryptographyTest {
     @Test
     fun `canonical JSON sorts nested objects and preserves arrays and ASCII escapes`() {
         val input = Json.parseToJsonElement("""{"z":[2,{"b":"line\nquote\"","a":0}],"a":"ASCII"}""")
-        assertEquals("""{"a":"ASCII","z":[2,{"a":0,"b":"line\nquote\""}]}""", CanonicalJson.encode(input).decodeToString())
+        assertEquals(
+            """{"a":"ASCII","z":[2,{"a":0,"b":"line\nquote\""}]}""",
+            CanonicalJson.encode(input).decodeToString()
+        )
     }
 
     @Test
     fun `canonical signing domain rejects null boolean floating negative overflow and nonASCII`() {
-        for (input in listOf("null", "true", "false", "-1", "1.0", "1e2", "9223372036854775808", "\"Ж\"", "{\"Ж\":0}")) {
+        for (input in listOf(
+            "null",
+            "true",
+            "false",
+            "-1",
+            "1.0",
+            "1e2",
+            "9223372036854775808",
+            "\"Ж\"",
+            "{\"Ж\":0}"
+        )) {
             assertFailsWith<IllegalArgumentException>(input) { CanonicalJson.encode(Json.parseToJsonElement(input)) }
         }
         assertEquals("9223372036854775807", CanonicalJson.encode(JsonPrimitive(Long.MAX_VALUE)).decodeToString())
@@ -32,14 +45,21 @@ class CryptographyTest {
 
     @Test
     fun `SHA256 matches standard empty and abc vectors`() {
-        assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", JdkCryptography.sha256(byteArrayOf()).hex)
-        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", JdkCryptography.sha256("abc".toByteArray()).hex)
+        assertEquals(
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            JdkCryptography.sha256(byteArrayOf()).hex
+        )
+        assertEquals(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            JdkCryptography.sha256("abc".toByteArray()).hex
+        )
     }
 
     @Test
     fun `Ed25519 verifies RFC8032 empty message vector using 32 raw public bytes`() {
         val key = PublicKeyHex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
-        val signature = SignatureHex("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b")
+        val signature =
+            SignatureHex("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b")
         assertTrue(JdkCryptography.verify(key, byteArrayOf(), signature))
         assertFalse(JdkCryptography.verify(key, byteArrayOf(1), signature))
         assertFalse(JdkCryptography.verify(PublicKeyHex("f".repeat(64)), byteArrayOf(), signature))
