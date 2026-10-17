@@ -16,7 +16,7 @@ object TuiMain {
             err.println("Для TUI нужен интерактивный терминал. Используйте --demo или --experiments.")
             return 1
         }
-        val saved = controller.session.export()
+        val saved = controller.export()
         println("Материалы: ${controller.session.reports.directory.toAbsolutePath()}")
         if (saved is WriteResult.Failed) err.println("Ошибка экспорта: ${saved.reason}")
         return if (saved == WriteResult.Saved) 0 else 1

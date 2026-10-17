@@ -1,11 +1,12 @@
 package tui
 
 import com.jakewharton.mosaic.layout.KeyEvent
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
+import report.WriteResult
 import java.nio.file.Files
-import kotlinx.serialization.json.*
+import java.nio.file.Path
 import kotlin.test.*
 
 class TuiControllerTest {
@@ -16,6 +17,24 @@ class TuiControllerTest {
         repeat((target.ordinal - section.ordinal + Section.entries.size) % Section.entries.size) { key("ArrowDown") }
         key("Enter")
         assertEquals(target, section)
+    }
+
+    @Test
+    fun `final export includes experimental sessions and reports their write failures`() {
+        val blocked = root.resolve("blocked-experiments")
+        Files.writeString(blocked, "not a directory")
+        val controller = TuiController(blocked).apply { section = Section.EXPERIMENTS }
+        controller.key("Enter")
+        assertIs<WriteResult.Failed>(controller.session.lastWrite)
+        assertEquals(WriteResult.Saved, controller.session.export(root.resolve("manual-retry")))
+
+        assertIs<WriteResult.Failed>(controller.export())
+        val retryRoot = root.resolve("all-retry")
+        assertEquals(WriteResult.Saved, controller.export(retryRoot))
+        val directories = Files.list(retryRoot).use { it.toList() }
+        assertEquals(2, directories.size)
+        val experiments = Files.readAllLines(controller.experimentDirectory!!.resolve("events.jsonl"))
+        assertEquals(13, experiments.count { Json.parseToJsonElement(it).jsonObject["operation"]?.jsonPrimitive?.content == "experiment" })
     }
 
     @Test

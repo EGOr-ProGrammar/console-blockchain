@@ -198,6 +198,12 @@ class TuiController(val outputRoot: Path) {
         else -> 1
     }
 
+    fun export(root: Path? = null): WriteResult {
+        val writes = (listOf(session) + experimentSessions).map { it.export(root) }
+        experimentDirectory = experimentSessions.lastOrNull()?.reports?.directory
+        return writes.firstOrNull { it is WriteResult.Failed } ?: WriteResult.Saved
+    }
+
     fun detailValue(): JsonElement = when (section) {
         Section.WALLETS -> {
             val wallet = session.blockchain.wallets[selected.coerceIn(0, 2)]
@@ -338,10 +344,7 @@ class TuiController(val outputRoot: Path) {
                 1 -> focus++
                 else -> {
                     val result = try {
-                        val root = Path.of(exportRoot.value)
-                        val writes = listOf(session.export(root)) + experimentSessions.map { it.export(root) }
-                        experimentDirectory = experimentSessions.lastOrNull()?.reports?.directory
-                        writes.firstOrNull { it is WriteResult.Failed } ?: WriteResult.Saved
+                        export(Path.of(exportRoot.value))
                     } catch (error: InvalidPathException) {
                         WriteResult.Failed(error.message ?: "Invalid directory")
                     }
