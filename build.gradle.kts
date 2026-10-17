@@ -30,8 +30,17 @@ dependencies {
     testImplementation(libs.mosaic.testing)
 }
 
+// JetBrains' forwarding jar and AndroidX's real runtime share a filename in distributions.
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.runtime:runtime-desktop"))
+            .using(module("androidx.compose.runtime:runtime-desktop:${libs.versions.compose.get()}"))
+            .because("Use the AndroidX runtime directly instead of its empty forwarding jar")
+    }
+}
+
 application {
-    mainClass = "app.MainKt"
+    mainClass = "MainKt"
 }
 
 graalvmNative {
@@ -47,6 +56,27 @@ tasks.test {
 kotlin {
     jvmToolchain(21)
 }
+
+val buildInfoDirectory = layout.buildDirectory.dir("generated/build-info")
+val generateBuildInfo by tasks.registering {
+    val info = mapOf(
+        "application" to project.version.toString(), "gradle" to gradle.gradleVersion,
+        "java_toolchain" to "21", "kotlin" to libs.versions.kotlin.get(),
+        "serialization" to libs.versions.serialization.get(), "coroutines" to libs.versions.coroutines.get(),
+        "mosaic" to libs.versions.mosaic.get(), "compose" to libs.versions.compose.get(),
+        "native_build_tools" to libs.versions.native.get(), "junit" to libs.versions.junit.get(),
+    )
+    inputs.properties(info)
+    outputs.dir(buildInfoDirectory)
+    doLast {
+        buildInfoDirectory.get().file("build-info.properties").asFile.apply {
+            parentFile.mkdirs()
+            writeText(info.entries.joinToString("\n", postfix = "\n") { "${it.key}=${it.value}" })
+        }
+    }
+}
+sourceSets.main { resources.srcDir(buildInfoDirectory) }
+tasks.processResources { dependsOn(generateBuildInfo) }
 
 tasks.register("verifyComposeClasspath") {
     description = "Checks that Compose runtime classes have a single provider on both classpaths."
