@@ -5,11 +5,23 @@ import model.*
 object ChainValidator {
     fun validate(genesis: Genesis, chain: List<Block>): ValidationResult {
         val genesisResult = GenesisRules.validate(genesis)
+
         if (genesisResult is ValidationResult.Invalid) return genesisResult
+
         val first = chain.firstOrNull()
-        if (first == null || first.header != genesis.block.header || first.blockHash != genesis.block.blockHash || first.transactions.isNotEmpty()) {
-            return ValidationResult.Invalid(ValidationError("GENESIS", "Chain must begin with the declared genesis", blockIndex = 0))
+
+        if (first == null || first.header != genesis.block.header || first.blockHash != genesis.block.blockHash ||
+            first.transactions.isNotEmpty()
+        ) {
+            return ValidationResult.Invalid(
+                ValidationError(
+                    "GENESIS",
+                    "Chain must begin with the declared genesis",
+                    blockIndex = 0,
+                ),
+            )
         }
+
         var state = GenesisRules.initialLedger(genesis)
         val accepted = mutableListOf(first)
         val validator = DefaultBlockValidator()
@@ -20,6 +32,7 @@ object ChainValidator {
             }
             accepted += block
         }
+
         return ValidationResult.Valid
     }
 }
