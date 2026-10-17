@@ -1,4 +1,5 @@
 import java.util.zip.ZipFile
+import java.io.DataInputStream
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -52,8 +53,21 @@ tasks.register("verifyComposeClasspath") {
     doLast {
         listOf("runtimeClasspath", "testRuntimeClasspath").forEach { name ->
             val providers = mutableMapOf<String, String>()
+            val metadataVersions = mutableSetOf<String>()
             configurations.getByName(name).files.filter { it.extension == "jar" }.forEach { jar ->
                 ZipFile(jar).use { zip ->
+                    zip.entries().asSequence().filter { it.name.endsWith(".kotlin_module") }.forEach { entry ->
+                        DataInputStream(zip.getInputStream(entry)).use { input ->
+                            val count = input.readInt()
+                            check(count in 2..8) { "Unknown Kotlin metadata in ${jar.name}" }
+                            val major = input.readInt()
+                            val minor = input.readInt()
+                            check(major < 2 || (major == 2 && minor <= 2)) {
+                                "${jar.name} metadata $major.$minor exceeds the IDE Kotlin 2.2 baseline"
+                            }
+                            metadataVersions += "$major.$minor"
+                        }
+                    }
                     zip.entries().asSequence()
                         .filter { it.name.startsWith("androidx/compose/runtime/") && it.name.endsWith(".class") }
                         .forEach { entry ->
@@ -65,6 +79,7 @@ tasks.register("verifyComposeClasspath") {
             }
             check(providers.isNotEmpty()) { "$name: Compose runtime missing" }
             logger.lifecycle("$name: ${providers.size} Compose classes, no duplicates")
+            logger.lifecycle("$name: Kotlin metadata ${metadataVersions.sorted().joinToString()}, compatible with 2.2")
         }
     }
 }
