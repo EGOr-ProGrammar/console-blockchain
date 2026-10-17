@@ -37,7 +37,7 @@ object TuiTheme {
     val surface = rgb(0x1E293B)
     fun ink(ink: Ink): Color = rgb(when (ink) {
         Ink.TEXT -> 0xE2E8F0; Ink.MUTED -> 0x94A3B8; Ink.BORDER -> 0x475569; Ink.ACCENT -> 0x38BDF8
-        Ink.SUCCESS -> 0x4ADE80; Ink.WAITING -> 0xFBBF24; Ink.ERROR -> 0xFB7185
+        Ink.FOCUS -> 0xFBBF24; Ink.SUCCESS -> 0x4ADE80; Ink.WAITING -> 0xFBBF24; Ink.ERROR -> 0xFB7185
     })
     private fun rgb(value: Int) = Color((value shr 16) and 255, (value shr 8) and 255, value and 255)
 }

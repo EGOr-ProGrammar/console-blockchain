@@ -51,6 +51,7 @@ class BlockchainScreenTest {
             assertTrue(colored.contains("38;2;56;189;248"))
             assertTrue(colored.contains("48;2;15;23;42"))
             assertTrue(colored.contains("48;2;30;41;59"))
+            assertTrue(Regex("38;2;251;191;36m[^\\n]*> A").containsMatchIn(colored))
         }
         runMosaicTest(strategy) {
             val controller = TuiController(root).apply { section = Section.BLOCKS }

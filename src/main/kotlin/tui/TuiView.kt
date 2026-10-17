@@ -5,7 +5,7 @@ import model.*
 import report.*
 import kotlinx.serialization.json.*
 
-enum class Ink { TEXT, MUTED, BORDER, ACCENT, SUCCESS, WAITING, ERROR }
+enum class Ink { TEXT, MUTED, BORDER, ACCENT, FOCUS, SUCCESS, WAITING, ERROR }
 data class UiSpan(val text: String, val ink: Ink = Ink.TEXT, val surface: Boolean = false, val bold: Boolean = false)
 data class UiLine(val spans: List<UiSpan>, val selected: Boolean = false) {
     val plain: String get() = spans.joinToString("") { it.text }
@@ -23,24 +23,33 @@ object TuiView {
         if (columns < 80 || rows < 24) {
             val text = "Нужно 80x24; сейчас ${columns}x$rows. Увеличьте окно. Esc — выход."
             val lines = wrap(text, columns.coerceAtLeast(1)).map { line(it, Ink.WAITING) }
-            return UiFrame((lines + List(rows.coerceAtLeast(0)) { line("") }).take(rows.coerceAtLeast(0)), 0, false)
+            return UiFrame(lines.take((rows - 1).coerceAtLeast(0)), 0, false)
         }
         if (controller.viewportColumns != columns || controller.viewportRows != rows) controller.revealFocus = true
         controller.viewportColumns = columns; controller.viewportRows = rows
         val totalWidth = columns - outerPadding * 2
         val navWidth = if (columns >= 100) menuColumns else 0
         val workWidth = totalWidth - if (navWidth > 0) navWidth + panelGap else 0
-        val bodyHeight = rows - 6
         val split = columns >= 140 && !controller.helpOpen && !controller.menuOpen
         val snapshot = controller.session.blockchain.snapshot()
         val wallets = controller.session.blockchain.wallets
-        val header = listOf(
-            line("ConsoleBlockchain  |  сессия ${controller.session.reports.snapshot().id}", Ink.ACCENT, bold = true),
-            line("Высота ${snapshot.tip.header.index}  pending ${snapshot.pending.size}  " + wallets.joinToString("  ") {
-                val account = snapshot.ledger.accounts.getValue(it.address)
-                "${it.name}: ${account.balance} (nonce ${account.nextNonce})"
-            }, Ink.MUTED),
+        val headerContent = listOf(
+            line("Высота цепочки: ${snapshot.tip.header.index}    В очереди: ${snapshot.pending.size}    Сумма: ${snapshot.ledger.accounts.values.sumOf { it.balance }}"),
+            UiLine(wallets.flatMapIndexed { index, wallet ->
+                val account = snapshot.ledger.accounts.getValue(wallet.address)
+                listOf(
+                    UiSpan(if (index == 0) "" else "    "),
+                    UiSpan("${wallet.name}: ", Ink.ACCENT, bold = true),
+                    UiSpan(account.balance.toString()),
+                    UiSpan(" (nonce ${account.nextNonce})", Ink.MUTED),
+                )
+            }),
         )
+        val header = panel("ConsoleBlockchain | Сессия ${controller.session.reports.snapshot().id.take(8)}", headerContent, totalWidth, 4) + line("")
+        // Leave one terminal row free so the final newline cannot scroll the header away.
+        val bodyHeight = rows - header.size - 4 - 1
+        val workFocused = !controller.menuOpen && !controller.helpOpen && !controller.detailsOpen
+        val detailsFocused = controller.detailsOpen && !controller.menuOpen && !controller.helpOpen
         val details = pretty.encodeToString(JsonElement.serializer(), controller.detailValue())
         val body: List<UiLine>
         if (controller.helpOpen) {
@@ -58,9 +67,9 @@ object TuiView {
             ).flatMap { wrap(it, workWidth - 6).map(::line) + line("") }
             controller.scrollMax = (help.size - bodyHeight + 2).coerceAtLeast(0)
             controller.scroll = controller.scroll.coerceIn(0, controller.scrollMax)
-            body = panel("Справка", help, workWidth, bodyHeight, controller.scroll)
+            body = panel("Справка", help, workWidth, bodyHeight, controller.scroll, active = true)
         } else if (controller.menuOpen && navWidth == 0) {
-            body = panel("Разделы — Enter открыть", menu(controller, workWidth - 6), workWidth, bodyHeight)
+            body = panel("Разделы — Enter открыть", menu(controller, workWidth - 6), workWidth, bodyHeight, active = true)
         } else {
             val mainWidth = if (split) (workWidth - panelGap) / 2 else workWidth
             val content = content(controller, mainWidth - 6)
@@ -79,22 +88,28 @@ object TuiView {
             controller.scroll = controller.scroll.coerceIn(0, controller.scrollMax)
             body = when {
                 split -> combine(
-                    panel(controller.section.title, content, mainWidth, bodyHeight, controller.bodyOffset),
-                    panel("Подробности${if (controller.detailsOpen) " [PgUp/PgDn]" else " [Enter]"}", detailLines, detailWidth, bodyHeight, controller.detailOffset),
+                    panel(controller.section.title, content, mainWidth, bodyHeight, controller.bodyOffset, active = workFocused),
+                    panel("Подробности${if (controller.detailsOpen) " [PgUp/PgDn]" else " [Enter]"}", detailLines, detailWidth, bodyHeight, controller.detailOffset, active = detailsFocused),
                 )
-                controller.detailsOpen -> panel("${controller.section.title}: подробности", detailLines, workWidth, bodyHeight, controller.scroll)
-                else -> panel(controller.section.title, content, workWidth, bodyHeight, controller.bodyOffset)
+                controller.detailsOpen -> panel("${controller.section.title}: подробности", detailLines, workWidth, bodyHeight, controller.scroll, active = detailsFocused)
+                else -> panel(controller.section.title, content, workWidth, bodyHeight, controller.bodyOffset, active = workFocused)
             }
         }
         controller.revealFocus = false
-        val working = if (navWidth == 0) body else combine(panel("Разделы [F2]", menu(controller, navWidth - 6), navWidth, bodyHeight), body)
+        val working = if (navWidth == 0) body else combine(panel("Разделы [F2]", menu(controller, navWidth - 6), navWidth, bodyHeight, active = controller.menuOpen && !controller.helpOpen), body)
         val writeError = controller.session.lastWrite as? WriteResult.Failed
         val status = writeError?.let { "ОШИБКА ЭКСПОРТА: ${it.reason}; результаты в памяти. Журнал → экспорт." } ?: controller.status
         val statusInk = when { status.startsWith("ОШИБКА") || status.startsWith("ОТКАЗ") -> Ink.ERROR; status.startsWith("УСПЕХ") -> Ink.SUCCESS; else -> Ink.WAITING }
+        val focusTarget = when {
+            controller.helpOpen -> "Справка"
+            controller.menuOpen -> "Разделы"
+            controller.detailsOpen -> "Подробности"
+            else -> controller.section.title
+        }
         val footer = listOf(
             line("─".repeat(totalWidth), Ink.BORDER), line(status, statusInk),
             line("Tab/Shift+Tab  Стрелки  Enter  PgUp/PgDn  F1 помощь  F2 разделы  Esc выход", Ink.MUTED),
-            line("${controller.section.title}  |  шагов ${controller.session.reports.snapshot().events.size}  |  прокрутка ${controller.scroll}/${controller.scrollMax}", Ink.MUTED),
+            line("Фокус: $focusTarget  |  шагов ${controller.session.reports.snapshot().events.size}  |  прокрутка ${controller.scroll}/${controller.scrollMax}", Ink.MUTED),
         )
         return UiFrame((header + working + footer).map { padOuter(it, totalWidth) }, navWidth, split)
     }
@@ -102,25 +117,36 @@ object TuiView {
     private fun content(controller: TuiController, width: Int): List<UiLine> = buildList {
         val blockchain = controller.session.blockchain
         val snapshot = blockchain.snapshot()
+        val hasFocus = !controller.menuOpen && !controller.helpOpen && !controller.detailsOpen
+        fun marker(selected: Boolean) = if (selected) if (hasFocus) ">" else "*" else " "
         fun text(value: String, ink: Ink = Ink.TEXT) { addAll(wrap(value, width).map { line(it, ink) }) }
         fun action(label: String, index: Int, enabled: Boolean = true) {
-            add(line("${if (controller.focus == index) ">" else " "} [${if (enabled) label else "$label — недоступно"}]", if (enabled) Ink.ACCENT else Ink.MUTED, selected = controller.focus == index))
+            val listOwnsCursor = controller.itemCount() > 0 && when (controller.section) {
+                Section.TRANSFERS, Section.BLOCKS -> index == 4
+                Section.EXPERIMENTS -> index == 1
+                else -> false
+            }
+            val selected = controller.focus == index && !listOwnsCursor
+            val ink = if (selected && hasFocus) Ink.FOCUS else if (enabled) Ink.ACCENT else Ink.MUTED
+            add(line("${marker(selected)} [${if (enabled) label else "$label — недоступно"}]", ink, bold = selected && hasFocus, selected = selected))
         }
         fun field(label: String, value: String, index: Int) {
             val selected = controller.focus == index
-            add(line("${if (selected) ">" else " "} $label: $value", if (selected) Ink.ACCENT else Ink.TEXT, selected = selected))
+            add(line("${marker(selected)} $label: $value", if (selected && hasFocus) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = selected && hasFocus, selected = selected))
         }
         fun input(label: String, input: TextInput, index: Int) {
-            val prefix = "${if (controller.focus == index) ">" else " "} $label: "
+            val selected = controller.focus == index
+            val prefix = "${marker(selected)} $label: "
             val room = (width - prefix.length).coerceAtLeast(1)
-            val value = visible(input.value.substring(0, input.cursor)) + if (controller.focus == index) "|" else ""
+            val value = visible(input.value.substring(0, input.cursor)) + if (selected && hasFocus) "|" else ""
             val suffix = visible(input.value.substring(input.cursor))
             val start = (value.length - room + 1).coerceAtLeast(0)
-            add(line(prefix + (value + suffix).drop(start).take(room), if (controller.focus == index) Ink.ACCENT else Ink.TEXT, selected = controller.focus == index))
+            add(line(prefix + (value + suffix).drop(start).take(room), if (selected && hasFocus) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = selected && hasFocus, selected = selected))
         }
         fun item(value: String, index: Int, focus: Int) {
             val selected = controller.selected == index
-            add(line("${if (selected) ">" else " "} $value", if (selected) Ink.ACCENT else Ink.TEXT, selected = selected && controller.focus == focus))
+            val active = selected && controller.focus == focus && hasFocus
+            add(line("${if (selected) if (active) ">" else "*" else " "} $value", if (active) Ink.FOCUS else if (selected) Ink.ACCENT else Ink.TEXT, bold = active, selected = selected && controller.focus == focus))
         }
         when (controller.section) {
             Section.WALLETS -> {
@@ -204,16 +230,19 @@ object TuiView {
     }.map { fit(it, width) }
 
     private fun menu(controller: TuiController, width: Int): List<UiLine> = Section.entries.mapIndexed { index, section ->
-        line("${if (index == if (controller.menuOpen) controller.menuSelection else controller.section.ordinal) ">" else " "} ${section.title}", if (section == controller.section) Ink.ACCENT else Ink.TEXT)
+        val selected = index == if (controller.menuOpen) controller.menuSelection else controller.section.ordinal
+        val active = selected && controller.menuOpen && !controller.helpOpen
+        line("${if (selected) if (active) ">" else "*" else " "} ${section.title}", if (active) Ink.FOCUS else if (section == controller.section) Ink.ACCENT else Ink.TEXT, bold = active)
     }.map { fit(it, width) }
 
-    private fun panel(title: String, content: List<UiLine>, width: Int, height: Int, offset: Int = 0): List<UiLine> {
+    private fun panel(title: String, content: List<UiLine>, width: Int, height: Int, offset: Int = 0, active: Boolean = false): List<UiLine> {
         val inner = width - 2 - innerPadding * 2
-        val top = "─ ${visible(title)} ".take(width - 2).padEnd(width - 2, '─')
-        return listOf(line("┌$top┐", Ink.BORDER, bold = true)) + (0 until height - 2).map { index ->
+        val border = if (active) Ink.FOCUS else Ink.BORDER
+        val top = "─ ${if (active) "[фокус] " else ""}${visible(title)} ".take(width - 2).padEnd(width - 2, '─')
+        return listOf(line("┌$top┐", border, bold = true)) + (0 until height - 2).map { index ->
             val row = fit(content.getOrNull(offset + index) ?: line(""), inner)
-            UiLine(listOf(UiSpan("│", Ink.BORDER), UiSpan(" ".repeat(innerPadding), surface = true)) + row.spans.map { it.copy(surface = true) } + listOf(UiSpan(" ".repeat(innerPadding), surface = true), UiSpan("│", Ink.BORDER)))
-        } + line("└${"─".repeat(width - 2)}┘", Ink.BORDER)
+            UiLine(listOf(UiSpan("│", border), UiSpan(" ".repeat(innerPadding), surface = true)) + row.spans.map { it.copy(surface = true) } + listOf(UiSpan(" ".repeat(innerPadding), surface = true), UiSpan("│", border)))
+        } + line("└${"─".repeat(width - 2)}┘", border)
     }
 
     private fun combine(left: List<UiLine>, right: List<UiLine>): List<UiLine> = left.zip(right).map { (a, b) -> UiLine(a.spans + UiSpan(" ".repeat(panelGap)) + b.spans) }

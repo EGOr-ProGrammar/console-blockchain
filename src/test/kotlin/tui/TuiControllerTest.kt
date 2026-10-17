@@ -19,6 +19,22 @@ class TuiControllerTest {
     }
 
     @Test
+    fun `help and menu never receive focus at the same time`() {
+        val controller = TuiController(root)
+        controller.key("F1")
+        controller.key("F2")
+        assertFalse(controller.helpOpen)
+        assertTrue(controller.menuOpen)
+        controller.key("ArrowDown")
+        controller.key("Enter")
+        assertEquals(Section.SIGNATURES, controller.section)
+        controller.key("F2")
+        controller.key("F1")
+        assertTrue(controller.helpOpen)
+        assertFalse(controller.menuOpen)
+    }
+
+    @Test
     fun `F2 navigation and ordinary viewing never create public operation events`() {
         val controller = TuiController(root)
         controller.choose(Section.JOURNAL)

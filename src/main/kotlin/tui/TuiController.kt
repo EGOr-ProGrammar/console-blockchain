@@ -142,10 +142,10 @@ class TuiController(val outputRoot: Path) {
         }
         if (columns < 80 || rows < 24) return
         if (event.key == "F1") {
-            helpOpen = !helpOpen; return
+            helpOpen = !helpOpen; menuOpen = false; return
         }
         if (event.key == "F2") {
-            menuOpen = !menuOpen; menuSelection = section.ordinal; return
+            menuOpen = !menuOpen; helpOpen = false; menuSelection = section.ordinal; return
         }
         if (menuOpen) {
             when (event.key) {
