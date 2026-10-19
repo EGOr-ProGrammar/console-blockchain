@@ -1,6 +1,7 @@
 param(
     [string]$Executable = (Join-Path $PSScriptRoot '..\build\native\nativeCompile\ConsoleBlockchain.exe'),
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\build\native-verification')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\build\native-verification'),
+    [ValidateRange(1, 3600)][int]$TimeoutSeconds = 120
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,20 +13,49 @@ New-Item -ItemType Directory -Force -Path $isolated | Out-Null
 $copy = Join-Path $isolated 'ConsoleBlockchain.exe'
 Copy-Item -LiteralPath $sourceExecutable -Destination $copy
 
-$previousPath = $env:PATH
-$previousJavaHome = $env:JAVA_HOME
+$previousEnvironment = @{ PATH = $env:PATH; JAVA_HOME = $env:JAVA_HOME; GRAALVM_HOME = $env:GRAALVM_HOME }
 Push-Location $isolated
 try {
     $env:JAVA_HOME = $null
+    $env:GRAALVM_HOME = $null
     $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
     if (Get-Command java -ErrorAction SilentlyContinue) { throw 'java is still visible on PATH' }
     foreach ($mode in @('--demo', '--experiments')) {
-        & $copy $mode --output-dir $sessionsRoot
-        if ($LASTEXITCODE -ne 0) { throw "$mode exited with $LASTEXITCODE" }
+        $stdoutLog = Join-Path $runDirectory ($mode.TrimStart('-') + '.stdout.log')
+        $stderrLog = Join-Path $runDirectory ($mode.TrimStart('-') + '.stderr.log')
+        $process = New-Object Diagnostics.Process
+        $process.StartInfo = New-Object Diagnostics.ProcessStartInfo
+        $process.StartInfo.FileName = $copy
+        $process.StartInfo.Arguments = "$mode --output-dir `"$sessionsRoot`""
+        $process.StartInfo.WorkingDirectory = $isolated
+        $process.StartInfo.UseShellExecute = $false
+        $process.StartInfo.CreateNoWindow = $true
+        $process.StartInfo.RedirectStandardOutput = $true
+        $process.StartInfo.RedirectStandardError = $true
+        $process.StartInfo.StandardOutputEncoding = [Text.Encoding]::UTF8
+        $process.StartInfo.StandardErrorEncoding = [Text.Encoding]::UTF8
+        try {
+            if (-not $process.Start()) { throw "Could not start $copy" }
+            # Drain both pipes concurrently so a full stderr pipe cannot deadlock stdout.
+            $stdout = $process.StandardOutput.ReadToEndAsync()
+            $stderr = $process.StandardError.ReadToEndAsync()
+            $timedOut = -not $process.WaitForExit($TimeoutSeconds * 1000)
+            if ($timedOut) {
+                if (-not $process.HasExited) { $process.Kill() }
+                $process.WaitForExit()
+            }
+            [IO.File]::WriteAllText($stdoutLog, $stdout.GetAwaiter().GetResult())
+            [IO.File]::WriteAllText($stderrLog, $stderr.GetAwaiter().GetResult())
+            Write-Host ([IO.File]::ReadAllText($stdoutLog))
+            if ((Get-Item -LiteralPath $stderrLog).Length) { Write-Host ([IO.File]::ReadAllText($stderrLog)) }
+            if ($timedOut) { throw "$mode timed out after $TimeoutSeconds seconds. Logs: $runDirectory" }
+            if ($process.ExitCode -ne 0) { throw "$mode exited with $($process.ExitCode). Logs: $runDirectory" }
+        } finally {
+            $process.Dispose()
+        }
     }
 } finally {
-    $env:PATH = $previousPath
-    $env:JAVA_HOME = $previousJavaHome
+    foreach ($name in $previousEnvironment.Keys) { [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process') }
     Pop-Location
 }
 

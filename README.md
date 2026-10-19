@@ -58,6 +58,51 @@ $env:COLORTERM = 'truecolor'
 
 ## Сборка для разработчика
 
+### Полная нативная сборка одной командой
+
+На Windows x64 достаточно 64-битного Windows PowerShell 5.1 или новее и доступа в интернет для загрузки инструментов,
+зависимостей и исходников Mosaic:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build.ps1
+# Пересобрать с очисткой результатов Gradle, сохранив кэши инструментов и зависимостей Gradle:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build.ps1 -Clean
+```
+
+Скрипт устанавливает GraalVM/JDK 21.0.12, MSVC x64 и Windows SDK в `.gradle/native-tools`, проверяет SHA-256 архивов,
+собирает исправленную DLL Mosaic, выполняет `check verifyComposeClasspath` и собирает `MosaicProbe.exe` и приложение.
+Java и Gradle заранее устанавливать не нужно: Gradle Wrapper запускается на локальной GraalVM, а его дистрибутив и
+библиотеки сохраняются в `.gradle/gradle-user-home`. Версии и контрольные суммы инструментов закреплены в манифесте
+`tools/native-toolchain-packages.json`; исправные архивы используются повторно, отсутствующие или повреждённые
+распакованные файлы восстанавливаются. Установка не требует UAC и не меняет системные настройки.
+При `-Clean` исходники Mosaic в `build/mosaic-jni` удаляются и скачиваются заново.
+
+Готовый EXE проверяется без Java: `--demo` и `--experiments`, по 13 опытов и полный комплект материалов. Каждый сценарий
+ограничен 120 секундами. Только после успешной проверки обновляется `dist/ConsoleBlockchain.exe`. Код завершения
+полной сборки — `0` при успехе и `1` при ошибке; при ошибке до публикации прежний EXE в `dist` сохраняется.
+Итог содержит путь, размер и SHA-256 EXE. Журнал сборки находится в `.gradle/build-logs`, журналы запуска сценариев —
+в `build/native-verification/<UUID>`. Окружение и рабочий каталог восстанавливаются после завершения или ошибки.
+
+Цветной интерактивный запуск готового EXE:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run-native.ps1
+# При запуске из PowerShell можно передать аргументы массивом:
+.\tools\run-native.ps1 -ArgumentList @('--output-dir', 'D:\lab results')
+```
+
+Скрипт временно удаляет `NO_COLOR` и задаёт `COLORTERM=truecolor`, запускает приложение в текущем терминале,
+восстанавливает окружение и возвращает код завершения EXE. Прямой запуск EXE сохраняет автоопределение цвета и поддержку
+`NO_COLOR`. Отдельно проверьте TUI в Windows Terminal: цвета, кириллицу, изменение размера и выход через Esc.
+
+Проверки сборочных скриптов используют локальные тестовые архивы и не требуют загрузки SDK или тестового фреймворка:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\tests\test-tools.ps1
+```
+
+### Отдельные этапы сборки
+
 Нужны Windows x64 и JDK 21. Gradle Wrapper 8.14 включён в репозиторий. Версии зависимостей заданы в
 `gradle/libs.versions.toml`. Для совместимости с Kotlin-плагином IntelliJ IDEA ветки 252 используются Kotlin 2.2.20,
 Serialization 1.9.0, Coroutines 1.10.2 и Compose Runtime 1.9.0. После изменения сборочных скриптов выполните Reload All
@@ -85,7 +130,7 @@ Gradle Projects в IDEA.
 Для нативной сборки дополнительно нужны **GraalVM для JDK 21**, **MSVC x64** и **Windows SDK**. Эти инструменты нужны
 только разработчику.
 
-Вместо системной установки можно распаковать официальные MSVC x64 и Windows SDK локально, без UAC. Пакеты и SHA-256
+Вместо системной установки можно распаковать официальные GraalVM/JDK 21, MSVC x64 и Windows SDK локально, без UAC. Пакеты и SHA-256
 зафиксированы в `tools/native-toolchain-packages.json`:
 
 ```powershell
@@ -105,7 +150,7 @@ $env:GRAALVM_HOME = 'C:\path\to\graalvm-jdk-21'
 powershell -ExecutionPolicy Bypass -File .\tools\verify-native.ps1
 ```
 
-`tools/build-native.ps1` объединяет тесты, проверку classpath и обе нативные сборки; он также находит локальную GraalVM
+`tools/build-native.ps1` объединяет тесты, линтер, проверку classpath и обе нативные сборки; он также находит локальную GraalVM
 в `.gradle/native-tools`. `verify-native.ps1` копирует только EXE в отдельный каталог, удаляет Java из окружения
 дочерних процессов, запускает оба сценария и проверяет материалы. Исходный PATH и JAVA_HOME восстанавливаются после
 проверки.

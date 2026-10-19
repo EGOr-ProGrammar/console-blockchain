@@ -31,7 +31,12 @@ try {
     if (Test-Path (Join-Path $repository '.gradle/native-tools/portable-msvc')) { . (Join-Path $PSScriptRoot 'use-local-toolchain.ps1') }
     # Definitions already declare every JNI entry point; no generated prototypes are needed.
     [IO.File]::WriteAllText((Join-Path $work 'com_jakewharton_mosaic_tty_Jni.h'), "#include <jni.h>`n")
-    & cl.exe /nologo /LD /MT /O2 /std:c11 /experimental:c11atomics "/I$work" "/I$source/commonMain/c" "/I$JdkHome/include" "/I$JdkHome/include/win32" $jni (Join-Path $source 'commonMain/c/mosaic-tty-windows.c') (Join-Path $source 'commonMain/c/mosaic-test-tty-windows.c') /link /OUT:mosaic.dll
+    & (Join-Path $PSScriptRoot 'invoke-build-command.ps1') -FilePath 'cl.exe' -ArgumentList @(
+        '/nologo', '/LD', '/MT', '/O2', '/std:c11', '/experimental:c11atomics',
+        "/I$work", "/I$source/commonMain/c", "/I$JdkHome/include", "/I$JdkHome/include/win32",
+        $jni, (Join-Path $source 'commonMain/c/mosaic-tty-windows.c'), (Join-Path $source 'commonMain/c/mosaic-test-tty-windows.c'),
+        '/link', '/OUT:mosaic.dll'
+    )
     if ($LASTEXITCODE -ne 0) { throw 'Mosaic JNI compilation failed' }
     $resource = Join-Path $repository 'src/main/resources/com/jakewharton/mosaic/tty/jni/amd64'
     New-Item -ItemType Directory -Force -Path $resource | Out-Null
