@@ -11,6 +11,7 @@ import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.time.Instant
 import java.util.*
 
+/** Хранит публичные события в памяти и экспортирует материалы сессии в отдельный каталог. */
 class FileReportStore(private var root: Path, private val type: String) : ReportStore {
     private val id = UUID.randomUUID().toString()
     private val events = mutableListOf<LabEvent>()

@@ -19,6 +19,7 @@ enum class Section(val title: String) {
     JOURNAL("Журнал"),
 }
 
+/** Однострочное поле с перемещением курсора и выделением всего текста. */
 class TextInput(var value: String) {
     var cursor: Int = value.length
     private var selectedAll = false
@@ -84,6 +85,7 @@ class TextInput(var value: String) {
     }
 }
 
+/** Хранит состояние экранов и обрабатывает клавиши без привязки к отрисовке терминала. */
 class TuiController(outputRoot: Path, private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000 }) {
     val session = LabSession(outputRoot, "manual")
     var section = Section.WALLETS
@@ -173,6 +175,7 @@ class TuiController(outputRoot: Path, private val nowMillis: () -> Long = { Syst
                 Section.JOURNAL -> 3
             }
 
+    /** Обрабатывает ввод с учётом активной панели и текущего размера терминала. */
     fun handle(event: KeyEvent, columns: Int = 80, rows: Int = 24) {
         expireExitConfirmation()
         if (event.key != "Escape") exitConfirmationDeadline = null

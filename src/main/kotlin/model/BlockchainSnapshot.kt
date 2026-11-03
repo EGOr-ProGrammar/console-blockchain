@@ -1,5 +1,6 @@
 package model
 
+/** Снимок цепочки, подтверждённых счетов и очереди на момент проверки. */
 class BlockchainSnapshot(
     val genesis: Genesis,
     chain: List<Block>,

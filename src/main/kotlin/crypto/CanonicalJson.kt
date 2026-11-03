@@ -2,6 +2,7 @@ package crypto
 
 import kotlinx.serialization.json.*
 
+/** Компактный JSON с сортировкой ключей для одинаковых байтов подписи и хэширования. */
 object CanonicalJson : CanonicalEncoder {
     override fun encode(value: JsonElement): ByteArray = canonical(value).toString().toByteArray(Charsets.UTF_8)
 

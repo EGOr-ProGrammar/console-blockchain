@@ -6,6 +6,7 @@ import ledger.*
 import model.*
 import report.*
 
+/** Выполняет обязательные положительные и отрицательные опыты лабораторной работы. */
 class ControlScenario(private val session: LabSession) {
     private val blockchain = session.blockchain
     private val wallets = blockchain.wallets

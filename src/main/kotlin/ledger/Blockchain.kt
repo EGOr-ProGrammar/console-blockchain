@@ -13,6 +13,7 @@ class SubmissionResult(
     val checks: Map<NodeId, ValidationResult> = Collections.unmodifiableMap(LinkedHashMap(checks))
 }
 
+/** Учебный реестр в памяти: подтверждённое состояние меняется только при принятии блока. */
 class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
     val wallets: List<WalletInfo> = frozenList(listOf("A", "B", "C").map(signer::createWallet))
     private val genesis = GenesisRules.create(wallets)
@@ -23,6 +24,7 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
 
     fun snapshot(): BlockchainSnapshot = BlockchainSnapshot(genesis, chain, ledger, pending)
 
+    /** Создаёт и подписывает перевод; до принятия блока деньги остаются на прежних счетах. */
     fun createTransfer(sender: Address, recipient: Address, amount: String): SubmissionResult {
         val value = amount.takeIf { it.matches(Regex("[0-9]+")) }?.toLongOrNull()
 
@@ -36,6 +38,7 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         return submit(SignedTransaction(body, JdkCryptography.sha256(bytes), signer.sign(sender, bytes)))
     }
 
+    /** Передаёт копии транзакции трём проверяющим и добавляет её в очередь при общем согласии. */
     fun submit(transaction: SignedTransaction): SubmissionResult {
         val snapshot = ledger
         val checks =
@@ -62,6 +65,7 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         message: String,
     ) = SubmissionResult(null, emptyMap(), ValidationResult.Invalid(ValidationError(code, message)))
 
+    /** Формирует предложение на текущей высоте, не изменяя цепочку или очередь. */
     fun buildCandidate(producer: String, transactions: List<SignedTransaction> = snapshot().pending): Block {
         val header =
             BlockHeader(
@@ -87,6 +91,7 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         return result
     }
 
+    /** Проводит голосование и фиксирует победителя только при наличии кворума. */
     fun resolve(candidates: List<Block>, abstainingNodes: Set<NodeId> = emptySet()): ConsensusResult {
         val result = DefaultConsensusEngine().run(candidates, snapshot(), abstainingNodes)
         result.winner?.let { check(commit(it) is BlockValidation.Valid) { "Winner must still extend current state" } }
@@ -94,6 +99,7 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         return result
     }
 
+    /** Готовит два корректных предложения и третье с подменённой суммой для контрольного опыта. */
     fun conflictCandidates(): List<Block> {
         require(pending.size == 3)
         val first = buildCandidate("P1")

@@ -3,6 +3,7 @@ package ledger
 import crypto.*
 import model.*
 
+/** Создание и проверка начального блока с тремя распределениями по 100 единиц. */
 object GenesisRules {
     fun create(wallets: List<WalletInfo>): Genesis {
         require(wallets.size == 3 && wallets.map { it.address }.distinct().size == 3)

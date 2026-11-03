@@ -2,6 +2,7 @@ package model
 
 import kotlinx.serialization.Serializable
 
+/** Поля, которые сериализуются и подписываются отправителем. */
 @Serializable
 data class TransactionBody(
     val sender: Address,
@@ -16,5 +17,6 @@ data class TransactionBody(
     }
 }
 
+/** Подписанное тело с его SHA-256 идентификатором и подписью Ed25519. */
 @Serializable
 data class SignedTransaction(val body: TransactionBody, val txId: Hash256, val signature: SignatureHex)

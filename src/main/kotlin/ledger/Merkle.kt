@@ -3,6 +3,7 @@ package ledger
 import crypto.*
 import model.*
 
+/** Строит дерево по полным подписанным транзакциям; при нечётном числе узлов повторяет последний хэш. */
 object Merkle {
     fun build(transactions: List<SignedTransaction>): MerkleTree {
         require(transactions.size in 1..3) { "A block has 1–3 transactions" }

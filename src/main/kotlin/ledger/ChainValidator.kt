@@ -2,6 +2,7 @@ package ledger
 
 import model.*
 
+/** Проверяет цепочку от genesis и последовательно восстанавливает состояние для проверки транзакций. */
 object ChainValidator {
     fun validate(genesis: Genesis, chain: List<Block>): ValidationResult {
         val genesisResult = GenesisRules.validate(genesis)

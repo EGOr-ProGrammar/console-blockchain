@@ -40,6 +40,7 @@ object JdkCryptography : Cryptography {
     }
 }
 
+/** Хранит учебные закрытые ключи в памяти на время работы процесса. */
 class JdkWalletSigner : WalletSigner {
     private val keys = mutableMapOf<Address, PrivateKey>()
 

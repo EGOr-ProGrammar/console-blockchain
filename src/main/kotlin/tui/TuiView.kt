@@ -19,6 +19,7 @@ data class UiLine(val spans: List<UiSpan>, val selected: Boolean = false) {
 
 data class UiFrame(val lines: List<UiLine>, val menuWidth: Int, val splitDetails: Boolean)
 
+/** Собирает строки интерфейса под доступный размер терминала, сохраняя состояние прокрутки. */
 object TuiView {
     const val outerPadding = 1
     const val innerPadding = 2

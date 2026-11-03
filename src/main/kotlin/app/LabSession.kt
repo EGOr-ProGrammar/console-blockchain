@@ -7,6 +7,7 @@ import model.*
 import report.*
 import java.nio.file.Path
 
+/** Связывает операции реестра с публичным журналом одной учебной сессии. */
 class LabSession(root: Path, type: String, private val onResult: (String, JsonObject) -> Unit = { _, _ -> }) {
     val blockchain = Blockchain()
     val reports = FileReportStore(root, type)
@@ -111,6 +112,7 @@ class LabSession(root: Path, type: String, private val onResult: (String, JsonOb
         )
     }
 
+    /** Строит дерево по первым [count] записям очереди и сохраняет уровни в журнале. */
     fun merkle(count: Int): MerkleTree? {
         val pending = blockchain.snapshot().pending
 
