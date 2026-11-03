@@ -37,9 +37,11 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
     }
 
     fun submit(transaction: SignedTransaction): SubmissionResult {
+        val snapshot = ledger
         val checks =
             NodeId.entries.associateWith {
-                val result = transactionValidator.validate(transaction, ledger)
+                val copy = transaction.copy(body = transaction.body.copy())
+                val result = transactionValidator.validate(copy, snapshot)
 
                 if (result == ValidationResult.Valid && pending.any { it.body.sender == transaction.body.sender }) {
                     ValidationResult.Invalid(ValidationError("PENDING_SENDER", "Sender already has a pending transaction"))
@@ -78,7 +80,8 @@ class Blockchain(val signer: WalletSigner = JdkWalletSigner()) {
         if (result is BlockValidation.Valid) {
             ledger = result.state
             chain += block
-            pending.removeAll { transactionValidator.validate(it, ledger) != ValidationResult.Valid }
+            val included = block.transactions.map { it.txId }.toSet()
+            pending.removeAll { it.txId in included }
         }
 
         return result

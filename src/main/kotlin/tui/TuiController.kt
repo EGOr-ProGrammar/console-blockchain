@@ -84,13 +84,21 @@ class TextInput(var value: String) {
     }
 }
 
-class TuiController(outputRoot: Path) {
+class TuiController(outputRoot: Path, private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000 }) {
     val session = LabSession(outputRoot, "manual")
     var section = Section.WALLETS
     var menuOpen = false
     var helpOpen = false
     var detailsOpen = false
     var quit = false
+    var exitConfirmationDeadline: Long? = null
+        private set
+    val exitConfirmationRemainingMillis: Long
+        get() = exitConfirmationDeadline?.let { (it - nowMillis()).coerceAtLeast(0) } ?: 0
+
+    fun expireExitConfirmation() {
+        if (exitConfirmationRemainingMillis == 0L) exitConfirmationDeadline = null
+    }
     private val focuses = IntArray(Section.entries.size)
     private val selections = IntArray(Section.entries.size)
     private val bodyScrolls = IntArray(Section.entries.size)
@@ -166,14 +174,20 @@ class TuiController(outputRoot: Path) {
             }
 
     fun handle(event: KeyEvent, columns: Int = 80, rows: Int = 24) {
+        expireExitConfirmation()
+        if (event.key != "Escape") exitConfirmationDeadline = null
         revealFocus = event.key !in listOf("PageUp", "PageDown")
 
         if (event.key == "Escape") {
             when {
                 helpOpen -> helpOpen = false
-                menuOpen -> menuOpen = false
                 detailsOpen -> detailsOpen = false
-                else -> quit = true
+                !menuOpen -> {
+                    menuOpen = true
+                    menuSelection = section.ordinal
+                }
+                exitConfirmationDeadline != null -> quit = true
+                else -> exitConfirmationDeadline = nowMillis() + 3_000
             }
             return
         }
@@ -220,10 +234,10 @@ class TuiController(outputRoot: Path) {
 
         if (event.key in listOf("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown")) {
             val delta = if (event.key in listOf("ArrowLeft", "ArrowUp")) -1 else 1
-            when {
-                section == Section.TRANSFERS && focus == 0 -> sender = (sender + delta + 3) % 3
-                section == Section.TRANSFERS && focus == 1 -> recipient = (recipient + delta + 3) % 3
-                section == Section.MERKLE && focus == 0 -> leafCount = (leafCount - 1 + delta + 3) % 3 + 1
+            when (section) {
+                Section.TRANSFERS if focus == 0 -> sender = (sender + delta + 3) % 3
+                Section.TRANSFERS if focus == 1 -> recipient = (recipient + delta + 3) % 3
+                Section.MERKLE if focus == 0 -> leafCount = (leafCount - 1 + delta + 3) % 3 + 1
                 else -> selected = (selected + delta).coerceIn(0, (itemCount() - 1).coerceAtLeast(0))
             }
             return
@@ -232,11 +246,11 @@ class TuiController(outputRoot: Path) {
         if (event.key == "Enter") activate()
     }
 
-    private fun focusedInput(): TextInput? = when {
-        section == Section.SIGNATURES && focus == 0 -> originalMessage
-        section == Section.SIGNATURES && focus == 1 -> changedMessage
-        section == Section.TRANSFERS && focus == 2 -> amount
-        section == Section.JOURNAL && focus == 1 -> exportRoot
+    private fun focusedInput(): TextInput? = when (section) {
+        Section.SIGNATURES if focus == 0 -> originalMessage
+        Section.SIGNATURES if focus == 1 -> changedMessage
+        Section.TRANSFERS if focus == 2 -> amount
+        Section.JOURNAL if focus == 1 -> exportRoot
         else -> null
     }
 

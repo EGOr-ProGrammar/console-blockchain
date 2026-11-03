@@ -68,6 +68,7 @@ fun BlockchainSnapshot.publicJson(wallets: List<WalletInfo>): JsonObject = build
     put("height", tip.header.index)
     put("tip_hash", tip.blockHash.hex)
     put("accounts", ledger.publicJson(wallets))
+    put("pending_size", pending.size)
     put("pending", JsonArray(pending.map { it.canonicalObject() }))
     put("chain", JsonArray(chain.map { it.publicJson() }))
 }

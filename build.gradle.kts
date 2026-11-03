@@ -58,6 +58,15 @@ application {
     mainClass = "MainKt"
 }
 
+tasks.named<CreateStartScripts>("startScripts") {
+    doLast {
+        val script = windowsScript.readText()
+        val scope = "if \"%OS%\"==\"Windows_NT\" setlocal"
+        check(scope in script) { "Windows start script has no local environment scope" }
+        windowsScript.writeText(script.replace(scope, "$scope\r\nset \"NO_COLOR=\"\r\nset \"COLORTERM=truecolor\""))
+    }
+}
+
 graalvmNative {
     toolchainDetection.set(false)
     binaries.named("main") {

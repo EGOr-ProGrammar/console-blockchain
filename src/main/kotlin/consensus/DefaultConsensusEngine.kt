@@ -4,19 +4,25 @@ import ledger.DefaultBlockValidator
 import model.*
 
 class DefaultConsensusEngine : ConsensusEngine {
+
+    private val validator = DefaultBlockValidator()
+
     override fun run(
         candidates: List<Block>,
         snapshot: BlockchainSnapshot,
         abstainingNodes: Set<NodeId>,
     ): ConsensusResult {
         val distinct = candidates.distinctBy { it.header to (it.blockHash to it.transactions) }
-        val validator = DefaultBlockValidator()
         val evaluations = mutableListOf<CandidateEvaluation>()
         val votes =
             NodeId.entries.map { node ->
                 val checks =
                     distinct.map { candidate ->
-                        CandidateEvaluation(node, candidate, validator.validate(candidate, snapshot))
+                        val copy = candidate.copy(
+                            header = candidate.header.copy(),
+                            transactions = candidate.transactions.map { it.copy(body = it.body.copy()) },
+                        )
+                        CandidateEvaluation(node, copy, validator.validate(copy, snapshot))
                     }
                 evaluations += checks
                 val preferred =

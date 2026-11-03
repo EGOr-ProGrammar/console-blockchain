@@ -23,6 +23,63 @@ class TuiControllerTest {
     }
 
     @Test
+    fun `Escape moves from details to content to sections before requesting exit`() {
+        val controller = TuiController(root)
+        controller.key("Enter")
+        assertTrue(controller.detailsOpen)
+        controller.key("Escape")
+        assertFalse(controller.detailsOpen)
+        assertFalse(controller.menuOpen)
+        assertFalse(controller.quit)
+        controller.key("Escape")
+        assertTrue(controller.menuOpen)
+        assertEquals(controller.section.ordinal, controller.menuSelection)
+        assertFalse(controller.quit)
+        controller.key("Escape")
+        assertTrue(controller.menuOpen)
+        assertFalse(controller.quit)
+        assertTrue(TuiView.render(controller, 80, 24).lines.any { it.plain.contains("Нажмите ESC повторно для выхода") })
+        controller.key("Escape")
+        assertTrue(controller.quit)
+    }
+
+    @Test
+    fun `exit confirmation expires after three seconds and can be armed again`() {
+        var now = 0L
+        val controller = TuiController(root) { now }
+        controller.key("Escape")
+        controller.key("Escape")
+        now = 3_000
+        controller.key("Escape")
+        assertFalse(controller.quit)
+        assertEquals(3_000L, controller.exitConfirmationRemainingMillis)
+        now = 6_000
+        controller.expireExitConfirmation()
+        assertNull(controller.exitConfirmationDeadline)
+        assertFalse(TuiView.render(controller, 80, 24).lines.any { it.plain.contains("Нажмите ESC повторно") })
+        controller.key("Escape")
+        now = 8_999
+        controller.key("Escape")
+        assertTrue(controller.quit)
+    }
+
+    @Test
+    fun `another key cancels exit confirmation and preserves normal navigation`() {
+        val controller = TuiController(root)
+        controller.key("Escape")
+        controller.key("Escape")
+        controller.key("ArrowDown")
+        assertNull(controller.exitConfirmationDeadline)
+        assertEquals(1, controller.menuSelection)
+        controller.key("Escape")
+        assertFalse(controller.quit)
+        controller.key("Enter")
+        assertNull(controller.exitConfirmationDeadline)
+        assertEquals(Section.SIGNATURES, controller.section)
+        assertFalse(controller.menuOpen)
+    }
+
+    @Test
     fun `final export includes experimental sessions and reports their write failures`() {
         val blocked = root.resolve("blocked-experiments")
         Files.writeString(blocked, "not a directory")

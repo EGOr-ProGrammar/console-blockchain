@@ -7,7 +7,7 @@ import model.*
 import report.*
 import java.nio.file.Path
 
-class LabSession(root: Path, type: String) {
+class LabSession(root: Path, type: String, private val onResult: (String, JsonObject) -> Unit = { _, _ -> }) {
     val blockchain = Blockchain()
     val reports = FileReportStore(root, type)
     var lastWrite: WriteResult = WriteResult.Saved
@@ -36,6 +36,7 @@ class LabSession(root: Path, type: String) {
 
     fun record(operation: String, result: JsonObject) {
         lastWrite = reports.record(operation, result)
+        onResult(operation, result)
     }
 
     fun signMessage(message: String = "Blockchainlab 2", changed: String = "Blockchainlab 3"): JsonObject {

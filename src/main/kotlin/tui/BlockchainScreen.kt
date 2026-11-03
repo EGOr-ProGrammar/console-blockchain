@@ -6,6 +6,7 @@ import com.jakewharton.mosaic.layout.onKeyEvent
 import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.ui.*
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 
 @Composable
 fun BlockchainScreen(controller: TuiController, noColor: Boolean = false, onExit: () -> Unit = {}) {
@@ -14,6 +15,13 @@ fun BlockchainScreen(controller: TuiController, noColor: Boolean = false, onExit
 
     if (!controller.quit) {
         LaunchedEffect(Unit) { awaitCancellation() }
+        LaunchedEffect(controller.exitConfirmationDeadline) {
+            if (controller.exitConfirmationDeadline != null) {
+                delay(controller.exitConfirmationRemainingMillis)
+                controller.expireExitConfirmation()
+                revision++
+            }
+        }
 
         val frame = remember(revision, size) {
             TuiView.render(controller, size.columns, size.rows)

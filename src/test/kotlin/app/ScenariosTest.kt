@@ -31,6 +31,21 @@ class ScenariosTest {
     )
 
     @Test
+    fun `demo prints complete public protocol including merkle levels and committed state`() {
+        val output = ByteArrayOutputStream()
+        assertEquals(0, Cli.run(arrayOf("--demo", "--output-dir", root.toString()), PrintStream(output)))
+        val directory = Files.list(root).use { it.toList().single() }
+        val events = Files.readAllLines(directory.resolve("events.jsonl"))
+            .map { Json.parseToJsonElement(it).jsonObject }
+        val printed = output.toString(Charsets.UTF_8)
+        val pretty = Json { prettyPrint = true }
+        events.forEach { event ->
+            assertTrue(printed.contains(pretty.encodeToString(JsonObject.serializer(), event.getValue("result").jsonObject)))
+        }
+        assertFalse(printed.contains("private_key", ignoreCase = true))
+    }
+
+    @Test
     fun `each scenario invocation returns only its own experiment results`() {
         val scenario = ControlScenario(LabSession(root, "experiments"))
         val first = scenario.run()

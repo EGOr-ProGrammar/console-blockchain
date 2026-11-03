@@ -1,16 +1,15 @@
 package report
 
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.io.IOException
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.*
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.time.Instant
-import java.util.Properties
-import java.util.UUID
+import java.util.*
 
 class FileReportStore(private var root: Path, private val type: String) : ReportStore {
     private val id = UUID.randomUUID().toString()
@@ -48,7 +47,10 @@ class FileReportStore(private var root: Path, private val type: String) : Report
 
         return linkedMapOf(
             "metadata.json" to pretty.encodeToString(metadata()),
-            "events.jsonl" to events.joinToString("\n", postfix = if (events.isEmpty()) "" else "\n") { Json.encodeToString(it) },
+            "events.jsonl" to events.joinToString(
+                "\n",
+                postfix = if (events.isEmpty()) "" else "\n"
+            ) { Json.encodeToString(it) },
             "journal.txt" to events.joinToString("\n") { "Step ${it.step}: ${it.operation}\n${pretty.encodeToString(it.result)}\n" },
             "summary.md" to summary(candidates, balances, experiments),
             "candidates.csv" to csv(candidates),
@@ -61,10 +63,17 @@ class FileReportStore(private var root: Path, private val type: String) : Report
         put("session_id", id)
         put("session_type", type)
         put("started_at", started)
-        put("os", "${System.getProperty("os.name")} ${System.getProperty("os.version")} ${System.getProperty("os.arch")}")
+        put(
+            "os",
+            "${System.getProperty("os.name")} ${System.getProperty("os.version")} ${System.getProperty("os.arch")}"
+        )
         put("java_runtime", "${System.getProperty("java.runtime.version")} ${System.getProperty("java.vm.name")}")
-        val versions = Properties().apply { FileReportStore::class.java.getResourceAsStream("/build-info.properties")?.use(::load) }
-        put("versions", buildJsonObject { versions.stringPropertyNames().sorted().forEach { put(it, versions.getProperty(it)) } })
+        val versions = Properties().apply {
+            FileReportStore::class.java.getResourceAsStream("/build-info.properties")?.use(::load)
+        }
+        put(
+            "versions",
+            buildJsonObject { versions.stringPropertyNames().sorted().forEach { put(it, versions.getProperty(it)) } })
     }
 
     private fun writeAtomically(name: String, content: String) {
@@ -121,7 +130,16 @@ class FileReportStore(private var root: Path, private val type: String) : Report
 
         return buildList {
             add(listOf("field") + candidates.indices.map { "B${it + 1}" })
-            for (field in listOf("index", "prev_hash", "producer", "merkle_root", "block_hash", "verify_block", "reason", "accepted")) {
+            for (field in listOf(
+                "index",
+                "prev_hash",
+                "producer",
+                "merkle_root",
+                "block_hash",
+                "verify_block",
+                "reason",
+                "accepted"
+            )) {
                 add(
                     listOf(field) +
                         candidates.map { candidate ->
@@ -183,7 +201,8 @@ class FileReportStore(private var root: Path, private val type: String) : Report
         )
     }
 
-    private fun csv(rows: List<List<String>>): String = "\uFEFF" + rows.joinToString("\r\n", postfix = "\r\n") { row -> row.joinToString(",", transform = ::csvCell) }
+    private fun csv(rows: List<List<String>>): String =
+        "\uFEFF" + rows.joinToString("\r\n", postfix = "\r\n") { row -> row.joinToString(",", transform = ::csvCell) }
 
     private fun csvCell(value: String): String {
         val first = value.trimStart().firstOrNull()

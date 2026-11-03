@@ -18,6 +18,25 @@ class ConsensusTest {
     private val engine = DefaultConsensusEngine()
 
     @Test
+    fun `each node receives separate candidate and transaction copies`() {
+        val candidate = blockchain.conflictCandidates().first()
+        val result = engine.run(listOf(candidate), blockchain.snapshot())
+        val copies = result.evaluations.map { it.block }
+        assertEquals(3, copies.size)
+        copies.forEachIndexed { index, copy ->
+            assertNotSame(candidate, copy)
+            assertEquals(candidate.header, copy.header)
+            assertEquals(candidate.transactions, copy.transactions)
+            assertNotSame(candidate.transactions.first(), copy.transactions.first())
+            assertNotSame(candidate.transactions.first().body, copy.transactions.first().body)
+            copies.take(index).forEach { previous ->
+                assertNotSame(previous, copy)
+                assertNotSame(previous.transactions.first(), copy.transactions.first())
+            }
+        }
+    }
+
+    @Test
     fun `B1 B2 are valid B3 fails on signature and minimum valid hash wins independently of order`() {
         val candidates = blockchain.conflictCandidates()
         val validator = DefaultBlockValidator()

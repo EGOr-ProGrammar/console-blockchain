@@ -115,7 +115,7 @@ class BlocksTest {
     }
 
     @Test
-    fun `accepted alternative transaction evicts stale nonce but preserves other pending senders`() {
+    fun `accepted alternative transaction preserves pending records not included in block`() {
         seed()
         val before = blockchain.snapshot()
         val original = before.pending.first()
@@ -126,11 +126,12 @@ class BlocksTest {
 
         assertNotNull(blockchain.resolve(listOf(blockchain.buildCandidate("P1", listOf(alternative)))).winner)
 
-        assertEquals(before.pending.drop(1), blockchain.snapshot().pending)
+        assertEquals(before.pending, blockchain.snapshot().pending)
         assertEquals(
-            ValidationResult.Valid,
-            blockchain.createTransfer(wallets[0].address, wallets[1].address, "1").result
+            "NONCE",
+            assertIs<BlockValidation.Invalid>(
+                validator.validate(blockchain.buildCandidate("P2", listOf(original)), blockchain.snapshot())
+            ).error.code
         )
-        assertEquals(1L, blockchain.snapshot().pending.last().body.nonce)
     }
 }

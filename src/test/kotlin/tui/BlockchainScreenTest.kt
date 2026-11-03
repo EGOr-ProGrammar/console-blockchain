@@ -5,7 +5,8 @@ import com.jakewharton.mosaic.terminal.KeyboardEvent
 import com.jakewharton.mosaic.terminal.Terminal
 import com.jakewharton.mosaic.testing.SnapshotStrategy
 import com.jakewharton.mosaic.testing.runMosaicTest
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -14,6 +15,30 @@ import kotlin.test.*
 class BlockchainScreenTest {
     @TempDir
     lateinit var root: Path
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `exit prompt disappears without keyboard input and timeout restarts on next Escape`() = runTest {
+        val controller = TuiController(root) { testScheduler.currentTime }
+        var exited = false
+        runMosaicTest {
+            setContentAndSnapshot { BlockchainScreen(controller, onExit = { exited = true }) }
+            sendKeyEvent(KeyboardEvent(27)); awaitSnapshot()
+            sendKeyEvent(KeyboardEvent(27))
+            assertTrue(awaitSnapshot().contains("Нажмите ESC повторно для выхода"))
+            advanceTimeBy(3_000)
+            runCurrent()
+            val expired = awaitSnapshot()
+            assertFalse(expired.contains("Нажмите ESC повторно для выхода"))
+            assertTrue(expired.contains("ГОТОВО"))
+            assertFalse(exited)
+            sendKeyEvent(KeyboardEvent(27))
+            assertTrue(awaitSnapshot().contains("Нажмите ESC повторно для выхода"))
+            assertFalse(exited)
+            sendKeyEvent(KeyboardEvent(27)); awaitSnapshot()
+            assertTrue(exited)
+        }
+    }
 
     @Test
     fun `Mosaic routes menu focus input resize validation and exit without losing form`() = runTest {
@@ -42,6 +67,11 @@ class BlockchainScreenTest {
             sendKeyEvent(KeyboardEvent(13)); sendKeyEvent(KeyboardEvent(13))
             assertTrue(awaitSnapshot().contains("ОТКАЗ AMOUNT"))
             assertEquals("transfer", controller.session.reports.snapshot().events.last().operation)
+            sendKeyEvent(KeyboardEvent(27)); awaitSnapshot()
+            assertFalse(exited)
+            sendKeyEvent(KeyboardEvent(27))
+            assertTrue(awaitSnapshot().contains("Нажмите ESC повторно для выхода"))
+            assertFalse(exited)
             sendKeyEvent(KeyboardEvent(27)); awaitSnapshot()
             assertTrue(exited)
         }

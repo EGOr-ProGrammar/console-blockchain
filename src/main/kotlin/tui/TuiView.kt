@@ -25,10 +25,12 @@ object TuiView {
     const val panelGap = 2
     const val menuColumns = 22
     private val pretty = Json { prettyPrint = true }
+    private const val exitPrompt = "Нажмите ESC повторно для выхода"
 
     fun render(controller: TuiController, columns: Int, rows: Int): UiFrame {
         if (columns < 80 || rows < 24) {
-            val text = "Нужно 80x24; сейчас ${columns}x$rows. Увеличьте окно. Esc — выход."
+            val text = if (controller.exitConfirmationDeadline != null) exitPrompt else
+                "Нужно 80x24; сейчас ${columns}x$rows. Увеличьте окно. Esc — разделы / подтверждение выхода."
             val lines = wrap(text, columns.coerceAtLeast(1)).map { line(it, Ink.WAITING) }
 
             return UiFrame(lines.take((rows - 1).coerceAtLeast(0)), 0, false)
@@ -86,7 +88,8 @@ object TuiView {
                 "Стрелки — выбор кошелька, количества листьев или записи.",
                 "Enter — выполнить выделенное действие / открыть подробности.",
                 "PgUp / PgDn — прокрутка текущей панели.",
-                "Esc — закрыть подробности / меню / справку; затем выйти.",
+                "Esc — подробности → информация раздела → разделы.",
+                "В разделах: Esc, затем повторный Esc в течение 3 секунд — выход.",
                 "F1 — показать или закрыть справку.",
                 "В текстовых полях: Ctrl+A, Backspace, Delete, Home/End, стрелки.",
                 "Полные ключи, хэши и результаты доступны в подробностях и журнале.",
@@ -208,8 +211,12 @@ object TuiView {
 
     private fun footer(controller: TuiController, totalWidth: Int): List<UiLine> {
         val writeError = controller.session.lastWrite as? WriteResult.Failed
-        val status = writeError?.let { "ОШИБКА ЭКСПОРТА: ${it.reason}; результаты в памяти. Журнал → экспорт." }
-            ?: controller.status
+        val status = if (controller.exitConfirmationDeadline != null) {
+            exitPrompt
+        } else {
+            writeError?.let { "ОШИБКА ЭКСПОРТА: ${it.reason}; результаты в памяти. Журнал → экспорт." }
+                ?: controller.status
+        }
         val statusInk =
             when {
                 status.startsWith("ОШИБКА") || status.startsWith("ОТКАЗ") -> Ink.ERROR
@@ -228,7 +235,7 @@ object TuiView {
         return listOf(
             line("─".repeat(totalWidth), Ink.BORDER),
             line(status, statusInk),
-            line("Tab/Shift+Tab  Стрелки  Enter  PgUp/PgDn  F1 помощь  F2 разделы  Esc выход", Ink.MUTED),
+            line("Tab/Shift+Tab  Стрелки  Enter  PgUp/PgDn  F1 помощь  F2 разделы  Esc назад", Ink.MUTED),
             line(
                 "Фокус: $focusTarget  |  шагов ${controller.session.reports.snapshot().events.size}  |  прокрутка ${controller.scroll}/${controller.scrollMax}",
                 Ink.MUTED,

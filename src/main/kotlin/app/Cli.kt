@@ -1,5 +1,7 @@
 package app
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import report.WriteResult
 import tui.TuiMain
 import java.io.PrintStream
@@ -66,7 +68,12 @@ object Cli {
     }
 
     private fun runScenario(root: Path, mode: String, out: PrintStream, err: PrintStream): Int {
-        val session = LabSession(root, mode)
+        val pretty = Json { prettyPrint = true }
+        var step = 0
+        val session = LabSession(root, mode) { operation, result ->
+            out.println("Step ${++step}: $operation")
+            out.println(pretty.encodeToString(JsonObject.serializer(), result))
+        }
         val results = ControlScenario(session).run()
         results.forEach {
             out.println("${if (it.passed) "PASS" else "FAIL"} ${it.name}: ${it.actual}")
